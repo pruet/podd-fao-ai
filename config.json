@@ -1,0 +1,3 @@
+{
+  "guardrail_policy": "Determine if the image depicts a living animal, animal carcass, or animal body parts (such as skin, mouth, organs, legs, etc.).\nIf the image does NOT contain any animal, carcass, or animal body part (for example: if it contains only people, cars, buildings, landscapes, electronic devices, food, or general household items), you MUST set `is_valid_animal_image` to False and explain why in `invalid_reason` in the requested language.\nIf it is a valid animal-related image, set `is_valid_animal_image` to True."
+}

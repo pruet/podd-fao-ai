@@ -56,7 +56,7 @@ class DiagnosisResponse(BaseModel):
 
 async def get_lahis_token(client_id: str, client_secret: str, api_url: str) -> str:
     async with httpx.AsyncClient() as client:
-        token_url = f"{api_url.rstrip('/')}/oauth/token/"
+        token_url = f"{api_url.rstrip('/')}/o/token/"
         data = {
             "grant_type": "client_credentials",
             "client_id": client_id,
@@ -75,7 +75,7 @@ async def get_lahis_token(client_id: str, client_secret: str, api_url: str) -> s
 
 async def fetch_lahis_report_image(report_id: str, token: str, api_url: str) -> bytes:
     async with httpx.AsyncClient() as client:
-        report_url = f"{api_url.rstrip('/')}/api/v1/reports/{report_id}/"
+        report_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/images"
         headers = {"Authorization": f"Bearer {token}"}
         try:
             response = await client.get(report_url, headers=headers, timeout=15.0)
@@ -84,38 +84,36 @@ async def fetch_lahis_report_image(report_id: str, token: str, api_url: str) -> 
         except Exception as e:
             raise HTTPException(
                 status_code=502,
-                detail=f"Failed to fetch report {report_id} from LAHIS: {str(e)}"
+                detail=f"Failed to fetch report {report_id} images from LAHIS: {str(e)}"
             )
         
-        image_url = None
-        # 1. Check for 'images' list
-        if "images" in report_data and isinstance(report_data["images"], list) and len(report_data["images"]) > 0:
-            first_img = report_data["images"][0]
-            if isinstance(first_img, dict):
-                image_url = first_img.get("url") or first_img.get("file") or first_img.get("image")
-            elif isinstance(first_img, str):
-                image_url = first_img
-        # 2. Check direct fields
-        if not image_url:
-            image_url = report_data.get("image_url") or report_data.get("image") or report_data.get("file")
-            
-        if not image_url:
+        images = report_data.get("images") or []
+        if not images or not isinstance(images, list):
             raise HTTPException(
                 status_code=404,
                 detail=f"No animal image found in LAHIS report {report_id}."
             )
             
+        first_image = images[0]
+        content_path = None
+        if isinstance(first_image, dict):
+            content_path = first_image.get("links", {}).get("content")
+            
+        if not content_path:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No image download path found in LAHIS report {report_id}."
+            )
+            
+        download_url = f"{api_url.rstrip('/')}{content_path}"
         try:
-            img_headers = {}
-            if image_url.startswith(api_url):
-                img_headers["Authorization"] = f"Bearer {token}"
-            img_response = await client.get(image_url, headers=img_headers, timeout=20.0)
+            img_response = await client.get(download_url, headers=headers, timeout=20.0)
             img_response.raise_for_status()
             return img_response.content
         except Exception as e:
             raise HTTPException(
                 status_code=502,
-                detail=f"Failed to download image from {image_url}: {str(e)}"
+                detail=f"Failed to download image from {download_url}: {str(e)}"
             )
 
 @app.post("/analyze", response_model=DiagnosisResponse)

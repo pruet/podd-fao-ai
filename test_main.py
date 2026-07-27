@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from main import app, get_genai_client
 
-class TestFAO_PODD_API(unittest.TestCase):
+class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.client = TestClient(app)
         
@@ -112,6 +112,69 @@ class TestFAO_PODD_API(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Either image file or report_id must be provided.", response.json()["detail"])
+
+    @patch("httpx.AsyncClient")
+    async def test_get_lahis_token_logic(self, mock_client_class):
+        from main import get_lahis_token
+        # Mock client instance and response
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "correct_token"}
+        mock_response.raise_for_status = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        
+        # Setup context manager return
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        
+        token = await get_lahis_token("my_client", "my_secret", "https://demo.api.lahis.ohtk.org")
+        self.assertEqual(token, "correct_token")
+        
+        # Verify the post endpoint called is the new one
+        mock_client.post.assert_called_once()
+        args, kwargs = mock_client.post.call_args
+        self.assertEqual(args[0], "https://demo.api.lahis.ohtk.org/o/token/")
+        self.assertEqual(kwargs["data"]["client_id"], "my_client")
+
+    @patch("httpx.AsyncClient")
+    async def test_fetch_lahis_report_image_logic(self, mock_client_class):
+        from main import fetch_lahis_report_image
+        mock_client = MagicMock()
+        
+        # Mock responses
+        mock_report_response = MagicMock()
+        mock_report_response.json.return_value = {
+            "images": [
+                {
+                    "id": "img123",
+                    "links": {
+                        "content": "/api/integrations/v1/reports/123/images/img123/content"
+                    }
+                }
+            ]
+        }
+        mock_report_response.raise_for_status = MagicMock()
+        
+        mock_img_response = MagicMock()
+        mock_img_response.content = b"fake-downloaded-bytes"
+        mock_img_response.raise_for_status = MagicMock()
+        
+        mock_client.get = AsyncMock(side_effect=[mock_report_response, mock_img_response])
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+        
+        content = await fetch_lahis_report_image("123", "tokenabc", "https://demo.api.lahis.ohtk.org")
+        self.assertEqual(content, b"fake-downloaded-bytes")
+        
+        # Verify GET calls
+        self.assertEqual(mock_client.get.call_count, 2)
+        
+        # First call: get report metadata
+        first_call = mock_client.get.call_args_list[0]
+        self.assertEqual(first_call[0][0], "https://demo.api.lahis.ohtk.org/api/integrations/v1/reports/123/images")
+        self.assertEqual(first_call[1]["headers"]["Authorization"], "Bearer tokenabc")
+        
+        # Second call: download image content
+        second_call = mock_client.get.call_args_list[1]
+        self.assertEqual(second_call[0][0], "https://demo.api.lahis.ohtk.org/api/integrations/v1/reports/123/images/img123/content")
 
 if __name__ == "__main__":
     unittest.main()

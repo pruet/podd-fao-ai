@@ -27,6 +27,73 @@ A professional FastAPI-based service designed to assist in animal disease diagno
 - **Dashboard UI**: Modern Vanilla HTML5 / CSS3 / JavaScript (Outfit typography, glassmorphism, responsive grid)
 
 ---
+## 🔌 API Endpoints
+
+### 1. Diagnosis Endpoint: `POST /analyze`
+
+Analyzes animal disease from a directly uploaded image or fetched dynamically from a LAHIS report ID.
+
+* **Request Type**: `multipart/form-data`
+* **Parameters**:
+  - `image` (File, Optional): The binary image of the sick animal (JPEG/PNG).
+  - `report_id` (Text, Optional): The report identifier from the LAHIS system. If provided, the API will fetch the image dynamically from LAHIS.
+  - `description` (Text, Optional): Symptoms, behaviors, or clinical signs observed.
+  - `lang` (Text, Optional): The desired response language. Supported: `en` (English), `th` (Thai), `lo` (Lao). Defaults to `en`.
+
+* **Response Example (`200 OK`)**:
+  ```json
+  {
+    "is_valid_animal_image": true,
+    "invalid_reason": null,
+    "animal_type": "Swine",
+    "diseases": [
+      {
+        "name": "African Swine Fever",
+        "confidence": 0.95,
+        "reasoning": "Observed high fever, dark spots on skin, and extreme lethargy consistent with clinical symptoms of ASF."
+      }
+    ]
+  }
+  ```
+
+---
+
+### 2. Live Dashboard: `GET /`
+
+Served as HTML, protected by HTTP Basic Authentication.
+* **Credentials**: Match the configured `DASHBOARD_USERNAME` and `DASHBOARD_PASSWORD`.
+
+---
+
+### 3. Fetch Request Logs: `GET /api/logs`
+
+Fetches recent diagnostic requests and their responses. Protected by Basic Authentication.
+* **Parameters**:
+  - `limit` (Query, Optional): Maximum number of log records to return. Defaults to `50`.
+
+* **Response Example (`200 OK`)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "timestamp": "2026-07-27T12:00:00.123456",
+      "method": "POST",
+      "path": "/analyze",
+      "status_code": 200,
+      "latency": 1.45,
+      "client_ip": "127.0.0.1",
+      "request_params": {
+        "lang": "en",
+        "description": "Limping cow",
+        "report_id": null,
+        "image_filename": "cow.jpg"
+      },
+      "response_body": "{\"is_valid_animal_image\":true,...}"
+    }
+  ]
+  ```
+
+---
 
 ## ⚙️ Configuration (`.env`)
 

@@ -179,14 +179,21 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second_call[0][0], "https://demo.api.lahis.ohtk.org/api/integrations/v1/reports/123/images/img123/content")
 
     def test_dashboard_and_logs_endpoints(self):
-        # Test dashboard HTML endpoint
+        # 1. Test unauthorized access (should return 401)
         response = self.client.get("/")
+        self.assertEqual(response.status_code, 401)
+        
+        response = self.client.get("/api/logs")
+        self.assertEqual(response.status_code, 401)
+
+        # 2. Test authorized access (should return 200)
+        # We pass auth=("admin", "admin") which corresponds to local default settings in setUp/env
+        response = self.client.get("/", auth=("admin", "admin"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/html", response.headers["content-type"])
         self.assertIn("FAO-PODD Diagnostics Dashboard", response.text)
 
-        # Test logs API retrieval
-        response = self.client.get("/api/logs")
+        response = self.client.get("/api/logs", auth=("admin", "admin"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("application/json", response.headers["content-type"])
         self.toBeInstance = isinstance(response.json(), list)

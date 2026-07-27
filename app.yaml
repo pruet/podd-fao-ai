@@ -7,3 +7,5 @@ env_variables:
   LAHIS_CLIENT_ID: "your_client_id_here"
   LAHIS_CLIENT_SECRET: "your_client_secret_here"
   LAHIS_LANG: "lo"
+  DASHBOARD_USERNAME: "admin"
+  DASHBOARD_PASSWORD: "admin"

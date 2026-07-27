@@ -1,8 +1,9 @@
 import os
 import io
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, status
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 from typing import List
 from google import genai
@@ -43,6 +44,24 @@ def init_db():
 
 # Initialize DB on load
 init_db()
+
+security = HTTPBasic()
+
+def authenticate_dashboard(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = os.getenv("DASHBOARD_USERNAME", "admin")
+    correct_password = os.getenv("DASHBOARD_PASSWORD", "admin")
+    
+    import secrets
+    is_correct_username = secrets.compare_digest(credentials.username, correct_username)
+    is_correct_password = secrets.compare_digest(credentials.password, correct_password)
+    
+    if not (is_correct_username and is_correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str):
     try:
@@ -297,7 +316,7 @@ async def analyze_animal_image(
         raise HTTPException(status_code=500, detail=f"Error generating analysis: {str(e)}")
 
 @app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
+async def serve_dashboard(username: str = Depends(authenticate_dashboard)):
     dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
     if os.path.exists(dashboard_path):
         with open(dashboard_path, "r", encoding="utf-8") as f:
@@ -305,7 +324,7 @@ async def serve_dashboard():
     return "<h1>FAO-PODD Dashboard</h1><p>dashboard.html not found</p>"
 
 @app.get("/api/logs")
-async def get_logs(limit: int = 50):
+async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboard)):
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row

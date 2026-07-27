@@ -9,10 +9,12 @@ import os
 # Ensure Src is in sys.path
 sys.path.append(os.path.dirname(__file__))
 
-from main import app, get_genai_client
+from main import app, get_genai_client, init_db
 
 class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        # Guarantee database exists
+        init_db()
         self.client = TestClient(app)
         
     @patch("main.get_genai_client")
@@ -38,8 +40,8 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         # Test image file
         image_data = io.BytesIO(b"fake image data")
         
-        # Mock PIL.Image.open to prevent actual image decoding errors
-        with patch("PIL.Image.open") as mock_image_open:
+        # Mock main.Image.open to prevent actual image decoding errors
+        with patch("main.Image.open") as mock_image_open:
             mock_image_open.return_value = MagicMock()
             
             response = self.client.post(
@@ -85,8 +87,8 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         mock_genai_client.models.generate_content.return_value = mock_response
         mock_get_client.return_value = mock_genai_client
         
-        # Mock PIL.Image.open
-        with patch("PIL.Image.open") as mock_image_open:
+        # Mock main.Image.open
+        with patch("main.Image.open") as mock_image_open:
             mock_image_open.return_value = MagicMock()
             
             response = self.client.post(
@@ -175,6 +177,20 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         # Second call: download image content
         second_call = mock_client.get.call_args_list[1]
         self.assertEqual(second_call[0][0], "https://demo.api.lahis.ohtk.org/api/integrations/v1/reports/123/images/img123/content")
+
+    def test_dashboard_and_logs_endpoints(self):
+        # Test dashboard HTML endpoint
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.headers["content-type"])
+        self.assertIn("FAO-PODD Diagnostics Dashboard", response.text)
+
+        # Test logs API retrieval
+        response = self.client.get("/api/logs")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/json", response.headers["content-type"])
+        self.toBeInstance = isinstance(response.json(), list)
+        self.assertTrue(self.toBeInstance)
 
 if __name__ == "__main__":
     unittest.main()

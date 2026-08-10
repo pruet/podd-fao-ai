@@ -21,6 +21,8 @@ import uuid
 
 load_dotenv()
 
+from google.cloud import datastore
+
 IS_GAE = os.getenv("GAE_ENV") == "standard" or "GAE_SERVICE" in os.environ
 if IS_GAE:
     DB_PATH = "/tmp/api_logs.db"
@@ -28,6 +30,16 @@ if IS_GAE:
 else:
     DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_logs.db")
     LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+
+USE_DATASTORE = IS_GAE or os.getenv("USE_DATASTORE") == "true"
+datastore_client = None
+
+if USE_DATASTORE:
+    try:
+        datastore_client = datastore.Client()
+    except Exception as e:
+        print(f"Failed to initialize Datastore client, falling back to SQLite: {e}")
+        USE_DATASTORE = False
 
 
 def init_db():
@@ -96,6 +108,29 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
             return item
         else:
             return str(item)
+
+    if USE_DATASTORE and datastore_client:
+        try:
+            key = datastore_client.key("ApiLog")
+            entity = datastore.Entity(key=key)
+            entity.update({
+                "timestamp": datetime.utcnow().isoformat(),
+                "method": method,
+                "path": path,
+                "status_code": status_code,
+                "latency": latency,
+                "client_ip": client_ip,
+                "request_params": json.dumps(make_serializable(request_params)),
+                "response_body": response_body,
+                "steps_json": json.dumps(make_serializable(steps_json)) if steps_json else None,
+                "image_path": image_path,
+                "prompt_tokens": prompt_tokens,
+                "output_tokens": output_tokens
+            })
+            datastore_client.put(entity)
+            return
+        except Exception as e:
+            print(f"Error logging to Datastore: {e}")
 
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -626,6 +661,33 @@ async def serve_dashboard(username: str = Depends(authenticate_dashboard)):
 
 @app.get("/api/logs")
 async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboard)):
+    if USE_DATASTORE and datastore_client:
+        try:
+            query = datastore_client.query(kind="ApiLog")
+            query.order = ["-timestamp"]
+            results = list(query.fetch(limit=limit))
+            
+            logs = []
+            for entity in results:
+                logs.append({
+                    "id": entity.key.id,
+                    "timestamp": entity.get("timestamp"),
+                    "method": entity.get("method"),
+                    "path": entity.get("path"),
+                    "status_code": entity.get("status_code"),
+                    "latency": entity.get("latency"),
+                    "client_ip": entity.get("client_ip"),
+                    "request_params": json.loads(entity.get("request_params") or "{}"),
+                    "response_body": entity.get("response_body"),
+                    "steps_json": json.loads(entity.get("steps_json")) if entity.get("steps_json") else None,
+                    "image_path": entity.get("image_path"),
+                    "prompt_tokens": entity.get("prompt_tokens", 0),
+                    "output_tokens": entity.get("output_tokens", 0)
+                })
+            return logs
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch logs from Datastore: {str(e)}")
+
     try:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row

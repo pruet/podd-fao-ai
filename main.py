@@ -1,5 +1,7 @@
 import os
 import io
+import hmac
+import hashlib
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, status
 from fastapi.responses import HTMLResponse
@@ -34,7 +36,8 @@ def init_db():
                 latency REAL,
                 client_ip TEXT,
                 request_params TEXT,
-                response_body TEXT
+                response_body TEXT,
+                steps_json TEXT
             )
         """)
         conn.commit()
@@ -63,13 +66,23 @@ def authenticate_dashboard(credentials: HTTPBasicCredentials = Depends(security)
         )
     return credentials.username
 
-def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str):
+def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str, steps_json: Optional[dict] = None):
+    def make_serializable(item):
+        if isinstance(item, dict):
+            return {k: make_serializable(v) for k, v in item.items()}
+        elif isinstance(item, list):
+            return [make_serializable(i) for i in item]
+        elif isinstance(item, (str, int, float, bool, type(None))):
+            return item
+        else:
+            return str(item)
+
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body, steps_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.utcnow().isoformat(),
             method,
@@ -77,8 +90,9 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
             status_code,
             latency,
             client_ip,
-            json.dumps(request_params),
-            response_body
+            json.dumps(make_serializable(request_params)),
+            response_body,
+            json.dumps(make_serializable(steps_json)) if steps_json else None
         ))
         conn.commit()
         conn.close()
@@ -97,7 +111,7 @@ def load_config():
 app = FastAPI(
     title="FAO-PODD Animal Disease Diagnosis API",
     description="Analyze animal images and descriptions to identify potential diseases.",
-    version="2.0"
+    version="2.3.0"
 )
 
 # Initialize GenAI Client
@@ -186,6 +200,84 @@ async def fetch_lahis_report_image(report_id: str, token: str, api_url: str) -> 
                 detail=f"Failed to download image from {download_url}: {str(e)}"
             )
 
+def verify_webhook_signature(path: str, timestamp: str, raw_body: bytes, signature: str) -> bool:
+    signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
+    if not signing_secret:
+        return True
+    message = f"POST\n{path}\n{timestamp}\n".encode("utf-8") + raw_body
+    expected_signature = hmac.new(
+        signing_secret.encode("utf-8"),
+        message,
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected_signature, signature)
+
+def format_diagnosis_comment(result: dict, lang: str) -> str:
+    animal_type = result.get("animal_type") or "Unknown"
+    is_valid = result.get("is_valid_animal_image")
+    
+    if not is_valid:
+        reason = result.get("invalid_reason") or "Invalid image"
+        if lang == "lo":
+            return f"ຜົນການວິເຄາະ AI: ຮູບພາບບໍ່ຖືກຕ້ອງ. ເຫດຜົນ: {reason}"
+        elif lang == "th":
+            return f"ผลการวิเคราะห์ AI: รูปภาพไม่ถูกต้อง เหตุผล: {reason}"
+        return f"AI Analysis Result: Invalid image. Reason: {reason}"
+        
+    diseases_list = []
+    for d in (result.get("diseases") or []):
+        name = d.get("name")
+        conf = d.get("confidence", 0.0) * 100
+        reason = d.get("reasoning") or ""
+        diseases_list.append(f"- {name} ({conf:.0f}%): {reason}")
+        
+    diseases_str = "\n".join(diseases_list)
+    if lang == "lo":
+        return f"ຜົນການວິເຄາະ AI:\n- ປະເພດສັດ: {animal_type}\n- ພະຍາດທີ່ເປັນໄປໄດ້:\n{diseases_str}"
+    elif lang == "th":
+        return f"ผลการวิเคราะห์ AI:\n- ประเภทสัตว์: {animal_type}\n- โรคที่เป็นไปได้:\n{diseases_str}"
+    return f"AI Analysis Result:\n- Animal Type: {animal_type}\n- Potential Diseases:\n{diseases_str}"
+
+async def submit_lahis_comment(report_id: str, event_id: str, body_text: str, confidence: float, tenant_api_url: str, token: str):
+    async with httpx.AsyncClient() as client:
+        comments_url = f"{tenant_api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/comments"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Idempotency-Key": f"ai-feedback-{event_id}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "externalActionId": f"ai-feedback-{event_id}",
+            "body": body_text,
+            "visibility": "staff",
+            "metadata": {
+                "model": "gemini-3.5-flash",
+                "confidence": confidence
+            },
+            "recommendation": {
+                "type": "officer_review",
+                "priority": "high" if confidence > 0.7 else "medium"
+            }
+        }
+        print(f"[STEP 4] Request back to LAHIS. URL: {comments_url}, Payload: {json.dumps(payload)}")
+        try:
+            response = await client.post(comments_url, json=payload, headers=headers, timeout=15.0)
+            print(f"[STEP 5] Response back from LAHIS. Status: {response.status_code}, Body: {response.text}")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            print(f"[STEP 5 ERROR] LAHIS comments API returned error: {e.response.status_code} - {e.response.text}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"LAHIS comments API returned error: {e.response.status_code} - {e.response.text}"
+            )
+        except Exception as e:
+            print(f"[STEP 5 ERROR] Failed to submit comment to LAHIS: {str(e)}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to submit comment to LAHIS: {str(e)}"
+            )
+
 @app.post("/analyze", response_model=DiagnosisResponse)
 async def analyze_animal_image(
     request: Request,
@@ -196,33 +288,93 @@ async def analyze_animal_image(
 ):
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
+    
+    # Initialize request_params early to prevent UnboundLocalError in exception handler
     request_params = {
         "lang": lang,
         "description": description,
         "report_id": report_id,
         "image_filename": image.filename if image else None
     }
+    steps = {
+        "step_1": {
+            "title": "1. Request from LAHIS",
+            "data": request_params
+        }
+    }
     
     try:
+        content_type = request.headers.get("content-type", "")
+        is_json = "application/json" in content_type
+        event_id = "unknown-event"
+        
+        if is_json:
+            raw_body = await request.body()
+            try:
+                body = json.loads(raw_body)
+                request_params = body
+            except Exception:
+                request_params = {"raw_body": raw_body.decode("utf-8", errors="ignore")}
+                raise HTTPException(status_code=400, detail="Invalid JSON body")
+                
+            timestamp = request.headers.get("x-ohtk-timestamp", "")
+            signature = request.headers.get("x-ohtk-signature", "")
+            
+            signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
+            if signing_secret:
+                if not signature or not timestamp:
+                    raise HTTPException(status_code=401, detail="Missing signature headers")
+                
+                path = request.url.path
+                alt_path = path + "/" if not path.endswith("/") else path[:-1]
+                
+                sig_ok = verify_webhook_signature(path, timestamp, raw_body, signature)
+                if not sig_ok:
+                    sig_ok = verify_webhook_signature(alt_path, timestamp, raw_body, signature)
+                    
+                if not sig_ok:
+                    raise HTTPException(status_code=401, detail="Invalid webhook signature")
+                    
+            event_type = body.get("eventType")
+            if event_type != "report.submitted":
+                raise HTTPException(status_code=400, detail=f"Unsupported eventType: {event_type}")
+                
+            report_data = body.get("report") or {}
+            report_id = report_data.get("id")
+            if not report_id:
+                raise HTTPException(status_code=400, detail="Missing report.id in payload")
+                
+            event_id = body.get("eventId") or "unknown-event"
+            lang = os.getenv("LAHIS_LANG", "lo")
+            description = f"Webhook Event ID: {event_id}. Report Type: {report_data.get('reportType', {}).get('name', 'Unknown')}"
+        else:
+            request_params = {
+                "lang": lang,
+                "description": description,
+                "report_id": report_id,
+                "image_filename": image.filename if image else None
+            }
+        steps["step_1"]["data"] = request_params
+        print(f"[STEP 1] Request from LAHIS. Content-Type: {content_type}, is_json: {is_json}, params/body: {json.dumps(request_params)}")
         if lang not in ["en", "th", "lo"]:
             raise HTTPException(status_code=400, detail="Unsupported language. Supported languages are 'en', 'th', 'lo'.")
             
-        if not image and not report_id:
+        if not is_json and not image and not report_id:
             raise HTTPException(status_code=400, detail="Either image file or report_id must be provided.")
         
         image_bytes = None
-        if image:
+        api_url = os.getenv("TENANT_API_URL")
+        client_id = os.getenv("LAHIS_CLIENT_ID")
+        client_secret = os.getenv("LAHIS_CLIENT_SECRET")
+        
+        if image and not is_json:
             # Read image bytes
             try:
                 image_bytes = await image.read()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
-        elif report_id:
+        else:
             # Fetch image bytes from LAHIS API
-            api_url = os.getenv("TENANT_API_URL")
-            client_id = os.getenv("LAHIS_CLIENT_ID")
-            client_secret = os.getenv("LAHIS_CLIENT_SECRET")
-            
             if not all([api_url, client_id, client_secret]):
                 raise HTTPException(
                     status_code=500,
@@ -265,6 +417,14 @@ async def analyze_animal_image(
           Description: {description or 'None provided'}
         """
         
+        steps["step_2"] = {
+            "title": "2. Request to Google AI",
+            "data": {
+                "model": "gemini-3.5-flash",
+                "prompt": prompt
+            }
+        }
+        print(f"[STEP 2] Request to Google AI. Model: gemini-3.5-flash, Prompt length: {len(prompt)}")
         # Run inference using gemini-3.5-flash
         response = genai_client.models.generate_content(
             model='gemini-3.5-flash',
@@ -275,7 +435,72 @@ async def analyze_animal_image(
                 temperature=0.2,
             ),
         )
+        print(f"[STEP 3] Response from Google AI: {response.text}")
         result = json.loads(response.text)
+        steps["step_3"] = {
+            "title": "3. Response from Google AI",
+            "data": result
+        }
+        
+        # If it was a webhook, post the feedback comment back to LAHIS
+        if is_json:
+            comment_body = format_diagnosis_comment(result, lang)
+            # Find highest confidence score from diseases
+            highest_confidence = 0.0
+            for d in (result.get("diseases") or []):
+                highest_confidence = max(highest_confidence, d.get("confidence", 0.0))
+            
+            # Re-fetch or reuse token to call comments API
+            token = await get_lahis_token(client_id, client_secret, api_url)
+            
+            comments_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/comments"
+            payload = {
+                "externalActionId": f"ai-feedback-{event_id}",
+                "body": comment_body,
+                "visibility": "staff",
+                "metadata": {
+                    "model": "gemini-3.5-flash",
+                    "confidence": highest_confidence
+                },
+                "recommendation": {
+                    "type": "officer_review",
+                    "priority": "high" if highest_confidence > 0.7 else "medium"
+                }
+            }
+            steps["step_4"] = {
+                "title": "4. Request back to LAHIS",
+                "data": {
+                    "url": comments_url,
+                    "payload": payload
+                }
+            }
+            try:
+                comment_response = await submit_lahis_comment(report_id, event_id, comment_body, highest_confidence, api_url, token)
+                steps["step_5"] = {
+                    "title": "5. Response back from LAHIS",
+                    "data": comment_response
+                }
+            except HTTPException as e:
+                steps["step_5"] = {
+                    "title": "5. Response back from LAHIS (Error)",
+                    "data": {
+                        "status_code": e.status_code,
+                        "detail": e.detail
+                    }
+                }
+                # Log intermediate steps before raising
+                latency = time.time() - start_time
+                log_request_response(
+                    method="POST",
+                    path="/analyze",
+                    status_code=e.status_code,
+                    latency=latency,
+                    client_ip=client_ip,
+                    request_params=request_params,
+                    response_body=json.dumps({"detail": e.detail}),
+                    steps_json=steps
+                )
+                raise e
         
         # Log success
         latency = time.time() - start_time
@@ -286,11 +511,14 @@ async def analyze_animal_image(
             latency=latency,
             client_ip=client_ip,
             request_params=request_params,
-            response_body=json.dumps(result)
+            response_body=json.dumps(result),
+            steps_json=steps
         )
         return result
 
     except HTTPException as e:
+        # Avoid double logging if already logged in the inner try block
+        # (Though status_code could be 502, let's log if not already written)
         latency = time.time() - start_time
         log_request_response(
             method="POST",
@@ -299,7 +527,8 @@ async def analyze_animal_image(
             latency=latency,
             client_ip=client_ip,
             request_params=request_params,
-            response_body=json.dumps({"detail": e.detail})
+            response_body=json.dumps({"detail": e.detail}),
+            steps_json=steps
         )
         raise e
     except Exception as e:
@@ -311,7 +540,8 @@ async def analyze_animal_image(
             latency=latency,
             client_ip=client_ip,
             request_params=request_params,
-            response_body=json.dumps({"detail": str(e)})
+            response_body=json.dumps({"detail": str(e)}),
+            steps_json=steps
         )
         raise HTTPException(status_code=500, detail=f"Error generating analysis: {str(e)}")
 
@@ -344,7 +574,8 @@ async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboa
                 "latency": row["latency"],
                 "client_ip": row["client_ip"],
                 "request_params": json.loads(row["request_params"]),
-                "response_body": row["response_body"]
+                "response_body": row["response_body"],
+                "steps_json": json.loads(row["steps_json"]) if ("steps_json" in row.keys() and row["steps_json"]) else None
             })
         return logs
     except Exception as e:

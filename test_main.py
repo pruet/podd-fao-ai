@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 import io
+import sqlite3
 import json
 import sys
 import os
@@ -198,6 +199,170 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertIn("application/json", response.headers["content-type"])
         self.toBeInstance = isinstance(response.json(), list)
         self.assertTrue(self.toBeInstance)
+
+    @patch("main.get_genai_client")
+    @patch("main.get_lahis_token", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_image", new_callable=AsyncMock)
+    @patch("main.submit_lahis_comment", new_callable=AsyncMock)
+    @patch.dict(os.environ, {
+        "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
+        "LAHIS_CLIENT_ID": "mock_client",
+        "LAHIS_CLIENT_SECRET": "mock_secret",
+        "LAHIS_SIGNING_SECRET": ""
+    })
+    def test_analyze_webhook_json(self, mock_submit_comment, mock_fetch_image, mock_get_token, mock_get_client):
+        mock_get_token.return_value = "mock_access_token"
+        mock_fetch_image.return_value = b"mock image bytes"
+        
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "is_valid_animal_image": True,
+            "invalid_reason": None,
+            "animal_type": "Goat",
+            "diseases": [
+                {
+                    "name": "Peste des Petits Ruminants",
+                    "confidence": 0.85,
+                    "reasoning": "High fever, nasal discharge"
+                }
+            ]
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+        
+        payload = {
+            "schemaVersion": "2026-06-02",
+            "eventType": "report.submitted",
+            "eventId": "event-123-abc",
+            "producedAt": "2026-07-21T10:30:00+00:00",
+            "tenant": {"schema": "demo", "code": "demo", "name": "LAHIS Demo"},
+            "report": {
+                "id": "report-999",
+                "createdAt": "2026-07-21T10:29:58+00:00",
+                "incidentDate": "2026-07-21",
+                "reportType": {"id": "type-123", "name": "Animal Sick/Death", "category": "Animal"},
+                "relevantAuthorityIds": [12],
+                "caseId": None
+            },
+            "links": {
+                "incident": "/api/integrations/v1/incidents/report-999",
+                "comments": "/api/integrations/v1/reports/report-999/comments",
+                "riskAssessments": "/api/integrations/v1/reports/report-999/risk-assessments",
+                "images": "/api/integrations/v1/reports/report-999/images"
+            }
+        }
+        
+        with patch("main.Image.open") as mock_image_open:
+            mock_image_open.return_value = MagicMock()
+            
+            response = self.client.post(
+                "/analyze",
+                json=payload
+            )
+            
+        self.assertEqual(response.status_code, 200)
+        res_json = response.json()
+        self.assertTrue(res_json["is_valid_animal_image"])
+        self.assertEqual(res_json["animal_type"], "Goat")
+        
+        mock_submit_comment.assert_called_once()
+        args, kwargs = mock_submit_comment.call_args
+        self.assertEqual(args[0], "report-999")
+        self.assertEqual(args[1], "event-123-abc")
+        self.assertIn("Peste des Petits Ruminants", args[2])
+        self.assertEqual(args[3], 0.85)
+
+    @patch("main.get_genai_client")
+    @patch.dict(os.environ, {
+        "LAHIS_SIGNING_SECRET": "test_signing_secret"
+    })
+    def test_webhook_invalid_signature_logged(self, mock_get_client):
+        response = self.client.post(
+            "/analyze",
+            json={"eventType": "report.submitted"}
+        )
+        self.assertEqual(response.status_code, 401)
+        
+        conn = sqlite3.connect("/tmp/api_logs.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM api_logs WHERE status_code = 401 ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        self.assertIsNotNone(row)
+        self.assertEqual(row[4], 401) # status_code
+
+    @patch("main.get_genai_client")
+    @patch("main.get_lahis_token", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_image", new_callable=AsyncMock)
+    @patch("main.submit_lahis_comment", new_callable=AsyncMock)
+    @patch.dict(os.environ, {
+        "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
+        "LAHIS_CLIENT_ID": "mock_client",
+        "LAHIS_CLIENT_SECRET": "mock_secret",
+        "LAHIS_SIGNING_SECRET": "my_secret_key"
+    })
+    def test_webhook_signature_with_trailing_slash(self, mock_submit_comment, mock_fetch_image, mock_get_token, mock_get_client):
+        import hmac
+        import hashlib
+        
+        mock_get_token.return_value = "mock_access_token"
+        mock_fetch_image.return_value = b"mock image bytes"
+        
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "is_valid_animal_image": True,
+            "invalid_reason": None,
+            "animal_type": "Goat",
+            "diseases": []
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+        
+        payload = {
+            "schemaVersion": "2026-06-02",
+            "eventType": "report.submitted",
+            "eventId": "event-123-abc",
+            "producedAt": "2026-07-21T10:30:00+00:00",
+            "tenant": {"schema": "demo", "code": "demo", "name": "LAHIS Demo"},
+            "report": {
+                "id": "report-999",
+                "createdAt": "2026-07-21T10:29:58+00:00",
+                "incidentDate": "2026-07-21",
+                "reportType": {"id": "type-123", "name": "Animal Sick/Death", "category": "Animal"},
+                "relevantAuthorityIds": [12],
+                "caseId": None
+            },
+            "links": {
+                "incident": "/api/integrations/v1/incidents/report-999",
+                "comments": "/api/integrations/v1/reports/report-999/comments",
+                "riskAssessments": "/api/integrations/v1/reports/report-999/risk-assessments",
+                "images": "/api/integrations/v1/reports/report-999/images"
+            }
+        }
+        
+        raw_body = json.dumps(payload).encode("utf-8")
+        timestamp = "2026-07-21T10:30:00Z"
+        
+        message = b"POST\n/analyze/\n" + timestamp.encode("utf-8") + b"\n" + raw_body
+        signature = hmac.new(b"my_secret_key", message, hashlib.sha256).hexdigest()
+        
+        with patch("main.Image.open") as mock_image_open:
+            mock_image_open.return_value = MagicMock()
+            
+            response = self.client.post(
+                "/analyze",
+                content=raw_body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-OHTK-Timestamp": timestamp,
+                    "X-OHTK-Signature": signature
+                }
+            )
+            
+        self.assertEqual(response.status_code, 200)
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FAO-PODD Diagnostics Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // Inline script to prevent FOUC
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.add('light-mode');
+            }
+        })();
+    </script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -16,6 +25,34 @@
             --danger-color: #ef4444;
             --text-primary: #f3f4f6;
             --text-secondary: #9ca3af;
+            --hover-bg: rgba(255, 255, 255, 0.02);
+            --modal-bg: #0f172a;
+            --code-bg: rgba(0, 0, 0, 0.4);
+            --code-border: rgba(255, 255, 255, 0.05);
+            --code-color: #38bdf8;
+            --td-color: #d1d5db;
+            --grad-1: rgba(79, 172, 254, 0.15);
+            --grad-2: rgba(0, 242, 254, 0.1);
+        }
+
+        :root.light-mode {
+            --bg-color: #f3f4f6;
+            --panel-bg: rgba(255, 255, 255, 0.8);
+            --border-color: rgba(0, 0, 0, 0.08);
+            --accent-color: #0284c7;
+            --accent-gradient: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            --success-color: #059669;
+            --danger-color: #dc2626;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --hover-bg: rgba(0, 0, 0, 0.02);
+            --modal-bg: #ffffff;
+            --code-bg: rgba(0, 0, 0, 0.05);
+            --code-border: rgba(0, 0, 0, 0.1);
+            --code-color: #0284c7;
+            --td-color: #374151;
+            --grad-1: rgba(14, 165, 233, 0.08);
+            --grad-2: rgba(2, 132, 199, 0.05);
         }
 
         * {
@@ -31,8 +68,9 @@
             min-height: 100vh;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(79, 172, 254, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.1) 0px, transparent 50%);
+                radial-gradient(at 0% 0%, var(--grad-1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, var(--grad-2) 0px, transparent 50%);
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .container {
@@ -227,7 +265,7 @@
             padding: 1rem;
             border-bottom: 1px solid var(--border-color);
             font-size: 0.9rem;
-            color: #d1d5db;
+            color: var(--td-color);
         }
 
         tr {
@@ -236,7 +274,7 @@
         }
 
         tr:hover {
-            background-color: rgba(255, 255, 255, 0.02);
+            background-color: var(--hover-bg);
         }
 
         .status-pill {
@@ -275,7 +313,7 @@
         }
 
         .modal-content {
-            background: #0f172a;
+            background: var(--modal-bg);
             border: 1px solid var(--border-color);
             border-radius: 24px;
             width: 90%;
@@ -331,15 +369,46 @@
         }
 
         .code-block {
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: var(--code-bg);
+            border: 1px solid var(--code-border);
             border-radius: 12px;
             padding: 1rem;
             overflow-x: auto;
             font-family: monospace;
             font-size: 0.85rem;
-            color: #38bdf8;
+            color: var(--code-color);
             margin-bottom: 1.5rem;
+        }
+
+        .theme-toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-color);
+        }
+
+        :root.light-mode .theme-toggle-btn {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-primary);
+        }
+
+        :root.light-mode .theme-toggle-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
+            border-color: var(--accent-color);
         }
     </style>
 </head>
@@ -351,12 +420,17 @@
                 <div class="logo-icon">F</div>
                 <div class="logo-title">
                     <h1>FAO-PODD Diagnostics</h1>
-                    <p>AI Diagnosis Request Monitor</p>
+                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.3.0</span></p>
                 </div>
             </div>
-            <div class="status-badge">
-                <div class="status-dot"></div>
-                API Monitor Connected
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button class="theme-toggle-btn" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
+                </button>
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    API Monitor Connected
+                </div>
             </div>
         </header>
 
@@ -413,6 +487,11 @@
 
             <div class="section-title">Response JSON</div>
             <pre class="code-block" id="modal-response" style="color: #34d399;"></pre>
+
+            <div id="modal-steps-container" style="display: none; margin-top: 1.5rem;">
+                <div class="section-title" style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin-top: 1rem;">Integration Flow Steps</div>
+                <div id="modal-steps-content"></div>
+            </div>
         </div>
     </div>
 
@@ -450,6 +529,8 @@
                 if (log.request_params) {
                     if (log.request_params.report_id) {
                         target = `Report ID: ${log.request_params.report_id}`;
+                    } else if (log.request_params.report && log.request_params.report.id) {
+                        target = `Report ID: ${log.request_params.report.id}`;
                     } else if (log.request_params.image_filename) {
                         target = `Upload: ${log.request_params.image_filename}`;
                     }
@@ -498,6 +579,41 @@
             
             document.getElementById('modal-response').innerText = responseText;
 
+            // Render integration flow steps if available
+            const stepsContainer = document.getElementById('modal-steps-container');
+            const stepsContent = document.getElementById('modal-steps-content');
+            stepsContainer.style.display = 'none';
+            stepsContent.innerHTML = '';
+            
+            if (log.steps_json) {
+                try {
+                    const steps = typeof log.steps_json === 'string' ? JSON.parse(log.steps_json) : log.steps_json;
+                    if (steps && Object.keys(steps).length > 0) {
+                        stepsContainer.style.display = 'block';
+                        let stepsHTML = '';
+                        // Sort keys to ensure chronological order step_1, step_2, etc.
+                        const sortedKeys = Object.keys(steps).sort((a, b) => {
+                            const numA = parseInt(a.replace('step_', '')) || 0;
+                            const numB = parseInt(b.replace('step_', '')) || 0;
+                            return numA - numB;
+                        });
+                        for (const key of sortedKeys) {
+                            const step = steps[key];
+                            const stepDataStr = typeof step.data === 'object' ? JSON.stringify(step.data, null, 2) : step.data;
+                            stepsHTML += `
+                                <div style="margin-bottom: 1.5rem; border-left: 3px solid var(--accent-color); padding-left: 12px; margin-top: 1rem;">
+                                    <h4 style="margin: 0 0 0.5rem 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 600;">${step.title}</h4>
+                                    <pre class="code-block" style="margin: 0; font-size: 0.8rem; background: rgba(0,0,0,0.15); max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">${stepDataStr}</pre>
+                                </div>
+                            `;
+                        }
+                        stepsContent.innerHTML = stepsHTML;
+                    }
+                } catch(e) {
+                    console.error("Failed to parse steps_json:", e);
+                }
+            }
+
             const modal = document.getElementById('detail-modal');
             modal.style.display = 'flex';
             setTimeout(() => modal.classList.add('active'), 10);
@@ -508,6 +624,28 @@
             modal.classList.remove('active');
             setTimeout(() => modal.style.display = 'none', 300);
         }
+
+        // Theme functions
+        function updateThemeUI(isLight) {
+            const icon = document.getElementById('theme-icon');
+            const text = document.getElementById('theme-text');
+            if (icon && text) {
+                icon.innerText = isLight ? '☀️' : '🌙';
+                text.innerText = isLight ? 'Light Mode' : 'Dark Mode';
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.documentElement.classList.toggle('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            updateThemeUI(isLight);
+        }
+
+        // Initialize UI theme states on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const isLight = document.documentElement.classList.contains('light-mode');
+            updateThemeUI(isLight);
+        });
 
         // Auto reload logs
         fetchLogs();

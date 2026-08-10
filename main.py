@@ -164,10 +164,11 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
 def load_config():
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
     if os.path.exists(config_path):
-        with open(open_config := config_path, "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {
-        "guardrail_policy": "Determine if the image contains an animal or animal body part."
+        "guardrail_policy": "Determine if the image contains an animal or animal body part.",
+        "prompt_template": "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. List up to three possible diseases affecting the animal in the image(s).\n3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n\nConstraints:\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
     }
 
 app = FastAPI(
@@ -487,26 +488,23 @@ async def analyze_animal_image(
         lang_names = {"en": "English", "th": "Thai", "lo": "Lao"}
         lang_name = lang_names[lang]
         
-        # Load guardrail policy from config.json
+        # Load guardrail policy and prompt_template from config.json
         config = load_config()
         guardrail_policy = config.get("guardrail_policy", "")
+        prompt_template = config.get(
+            "prompt_template",
+            "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. List up to three possible diseases affecting the animal in the image(s).\n3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n\nConstraints:\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
+        )
         
-        prompt = f"""
-        Analyze the provided image(s) and description.
-        
-        Guardrail Policy:
-        {guardrail_policy}
-    
-        Tasks (Execute ONLY if `is_valid_animal_image` is True):
-        1. Identify the type of animal.
-        2. List up to three possible diseases affecting the animal in the image(s).
-        3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.
-        
-        Constraints:
-        - You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.
-        - If a text description is provided below, incorporate it into your analysis:
-          Description: {description or 'None provided'}
-        """
+        try:
+            prompt = prompt_template.format(
+                guardrail_policy=guardrail_policy,
+                lang_name=lang_name,
+                description=description or 'None provided'
+            )
+        except Exception as e:
+            print(f"Error formatting prompt_template from config.json: {e}")
+            prompt = f"Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. List up to three possible diseases affecting the animal in the image(s).\n3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n\nConstraints:\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description or 'None provided'}"
         
         steps["step_2"] = {
             "title": "2. Request to Google AI",

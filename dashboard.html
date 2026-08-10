@@ -887,20 +887,29 @@
 
         function renderLogs(logs) {
             const tbody = document.getElementById('logs-tbody');
-            if (logs.length === 0) {
+            if (!logs || !Array.isArray(logs) || logs.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No requests logged yet.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = logs.map((log, index) => {
-                const date = new Date(log.timestamp);
-                const timeStr = date.toISOString().replace('T', ' ').substring(0, 19);
-                const isSuccess = log.status_code >= 200 && log.status_code < 300;
+                let timeStr = 'N/A';
+                if (log && log.timestamp) {
+                    try {
+                        const date = new Date(log.timestamp);
+                        if (!isNaN(date.getTime())) {
+                            timeStr = date.toISOString().replace('T', ' ').substring(0, 19);
+                        }
+                    } catch (e) {}
+                }
+                
+                const statusCode = (log && log.status_code != null) ? log.status_code : 200;
+                const isSuccess = statusCode >= 200 && statusCode < 300;
                 const statusClass = isSuccess ? 'success' : 'error';
                 
                 // Get display label (image filename or report_id)
                 let target = 'None';
-                if (log.request_params) {
+                if (log && log.request_params) {
                     if (log.request_params.report_id) {
                         target = `Report ID: ${log.request_params.report_id}`;
                     } else if (log.request_params.report && log.request_params.report.id) {
@@ -912,24 +921,26 @@
                     }
                 }
 
-                const cost = getGeminiCost(log);
+                const cost = log ? getGeminiCost(log) : 0;
                 const costStr = cost > 0 ? `$${cost.toFixed(5)}` : '$0.00000';
 
                 let sourceBadge = '';
-                if (log.request_params && log.request_params.source === 'web-tester') {
+                if (log && log.request_params && log.request_params.source === 'web-tester') {
                     sourceBadge = ' <span class="tester-badge">Tester</span>';
                 }
+
+                const latencyNum = (log && typeof log.latency === 'number' && !isNaN(log.latency)) ? log.latency : 0;
 
                 return `
                     <tr onclick="openModal(${index})">
                         <td>${timeStr}</td>
                         <td>
-                            <span style="font-weight: 600; color: var(--accent-color);">${log.method}</span>
+                            <span style="font-weight: 600; color: var(--accent-color);">${(log && log.method) || 'POST'}</span>
                             ${sourceBadge}
                         </td>
-                        <td><span class="status-pill ${statusClass}">${log.status_code}</span></td>
-                        <td>${log.latency.toFixed(3)}s</td>
-                        <td>${log.client_ip}</td>
+                        <td><span class="status-pill ${statusClass}">${statusCode}</span></td>
+                        <td>${latencyNum.toFixed(3)}s</td>
+                        <td>${(log && log.client_ip) || 'Unknown'}</td>
                         <td><span style="font-family: monospace; font-weight: 600; color: var(--accent-color);">${costStr}</span></td>
                         <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${target}</td>
                     </tr>
@@ -938,16 +949,16 @@
         }
 
         function calculateStats(logs) {
-            if (logs.length === 0) return;
+            if (!logs || !Array.isArray(logs) || logs.length === 0) return;
 
             const total = logs.length;
-            const successCount = logs.filter(l => l.status_code >= 200 && l.status_code < 300).length;
+            const successCount = logs.filter(l => l && (l.status_code || 200) >= 200 && (l.status_code || 200) < 300).length;
             const successRate = ((successCount / total) * 100).toFixed(0);
             
-            const totalLatency = logs.reduce((sum, l) => sum + l.latency, 0);
+            const totalLatency = logs.reduce((sum, l) => sum + (l && typeof l.latency === 'number' ? l.latency : 0), 0);
             const avgLatency = ((totalLatency / total) * 1000).toFixed(0);
 
-            const totalCost = logs.reduce((sum, l) => sum + getGeminiCost(l), 0);
+            const totalCost = logs.reduce((sum, l) => sum + (l ? getGeminiCost(l) : 0), 0);
 
             document.getElementById('stat-total').innerText = total;
             document.getElementById('stat-success').innerText = `${successRate}%`;

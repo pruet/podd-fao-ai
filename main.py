@@ -112,7 +112,10 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
     if USE_DATASTORE and datastore_client:
         try:
             key = datastore_client.key("ApiLog")
-            entity = datastore.Entity(key=key)
+            entity = datastore.Entity(
+                key=key,
+                exclude_from_indexes=("response_body", "steps_json", "request_params", "image_path")
+            )
             entity.update({
                 "timestamp": datetime.utcnow().isoformat(),
                 "method": method,
@@ -671,24 +674,46 @@ async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboa
             
             logs = []
             for entity in results:
+                raw_params = entity.get("request_params")
+                if isinstance(raw_params, str):
+                    try:
+                        parsed_params = json.loads(raw_params)
+                    except Exception:
+                        parsed_params = {"raw": raw_params}
+                elif isinstance(raw_params, dict):
+                    parsed_params = raw_params
+                else:
+                    parsed_params = {}
+
+                raw_steps = entity.get("steps_json")
+                if isinstance(raw_steps, str):
+                    try:
+                        parsed_steps = json.loads(raw_steps)
+                    except Exception:
+                        parsed_steps = None
+                elif isinstance(raw_steps, dict):
+                    parsed_steps = raw_steps
+                else:
+                    parsed_steps = None
+
                 logs.append({
                     "id": entity.key.id,
                     "timestamp": entity.get("timestamp"),
                     "method": entity.get("method"),
                     "path": entity.get("path"),
                     "status_code": entity.get("status_code"),
-                    "latency": entity.get("latency"),
+                    "latency": entity.get("latency") or 0.0,
                     "client_ip": entity.get("client_ip"),
-                    "request_params": json.loads(entity.get("request_params") or "{}"),
+                    "request_params": parsed_params,
                     "response_body": entity.get("response_body"),
-                    "steps_json": json.loads(entity.get("steps_json")) if entity.get("steps_json") else None,
+                    "steps_json": parsed_steps,
                     "image_path": entity.get("image_path"),
                     "prompt_tokens": entity.get("prompt_tokens", 0),
                     "output_tokens": entity.get("output_tokens", 0)
                 })
             return logs
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch logs from Datastore: {str(e)}")
+            print(f"Datastore fetch error: {e}")
 
     try:
         conn = sqlite3.connect(DB_PATH)

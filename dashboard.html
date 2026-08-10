@@ -410,6 +410,234 @@
             background: rgba(0, 0, 0, 0.08);
             border-color: var(--accent-color);
         }
+        /* Tabs Style */
+        .tabs-nav {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 1rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-color);
+            font-weight: 600;
+            border-bottom-color: var(--accent-color);
+        }
+
+        /* Tester Grid */
+        .tester-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1.8fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .tester-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.02);
+            position: relative;
+        }
+
+        .upload-area:hover, .upload-area.drag-over {
+            border-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .upload-area-icon {
+            font-size: 2.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .upload-preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 12px;
+            margin-top: 1rem;
+            display: none;
+            object-fit: contain;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-select, .form-input, .form-textarea {
+            width: 100%;
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .form-select:focus, .form-input:focus, .form-textarea:focus {
+            border-color: var(--accent-color);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .submit-btn {
+            background: var(--accent-color);
+            color: #000000;
+            border: none;
+            border-radius: 10px;
+            padding: 0.9rem 1.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s, transform 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            opacity: 0.9;
+        }
+
+        .submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Result Cards */
+        .result-empty {
+            border: 1px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 4rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .result-badge {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .result-badge.invalid {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        .disease-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .disease-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .disease-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .disease-name {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .disease-confidence {
+            font-size: 0.85rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #000;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -434,44 +662,137 @@
             </div>
         </header>
 
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total API Calls</div>
-                <div class="stat-value" id="stat-total">0</div>
+        <!-- Tabs Navigation -->
+        <div class="tabs-nav">
+            <button class="tab-btn active" id="tab-logs" onclick="switchTab('logs')">Request Logs</button>
+            <button class="tab-btn" id="tab-test" onclick="switchTab('test')">Inference Tester</button>
+        </div>
+
+        <div id="content-logs">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total API Calls</div>
+                    <div class="stat-value" id="stat-total">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Success Rate</div>
+                    <div class="stat-value" id="stat-success">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avg Latency</div>
+                    <div class="stat-value" id="stat-latency">0 ms</div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Success Rate</div>
-                <div class="stat-value" id="stat-success">0%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Avg Latency</div>
-                <div class="stat-value" id="stat-latency">0 ms</div>
+
+            <!-- Logs Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Recent Requests</div>
+                    <button class="refresh-btn" onclick="fetchLogs()">Manual Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time (UTC)</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th>Latency (s)</th>
+                                <th>Client IP</th>
+                                <th>Target</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-tbody">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- Logs Panel -->
-        <div class="panel">
-            <div class="panel-header">
-                <div class="panel-title">Recent Requests</div>
-                <button class="refresh-btn" onclick="fetchLogs()">Manual Refresh</button>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Time (UTC)</th>
-                            <th>Method</th>
-                            <th>Status</th>
-                            <th>Latency (s)</th>
-                            <th>Client IP</th>
-                            <th>Target</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logs-tbody">
-                        <!-- Filled by JS -->
-                    </tbody>
-                </table>
+        <!-- Inference Tester Panel -->
+        <div id="content-test" style="display: none;">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Inference Tester</div>
+                </div>
+                <div style="padding: 1rem 1.5rem;">
+                    <div class="tester-grid">
+                        <!-- Left Form Column -->
+                        <div class="panel-body" style="padding: 0;">
+                            <form id="tester-form" onsubmit="runDiagnosis(event)">
+                                <div class="form-group">
+                                    <label class="form-label">Animal Image</label>
+                                    <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                                        <div class="upload-area-icon">📸</div>
+                                        <div style="font-weight: 500; color: var(--text-primary);">Drag & Drop your image here</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">or click to browse from device</div>
+                                        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                                        <img id="image-preview" class="upload-preview" alt="Preview">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group" style="text-align: center; font-weight: 600; color: var(--text-secondary); margin: 1rem 0;">
+                                    — OR —
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="report-id-input">LAHIS Report ID</label>
+                                    <input type="text" class="form-input" id="report-id-input" placeholder="e.g. 12345 (to fetch image from LAHIS)">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="lang-select">Language</label>
+                                    <select class="form-select" id="lang-select">
+                                        <option value="en">English</option>
+                                        <option value="lo" selected>Lao (Lao language)</option>
+                                        <option value="th">Thai</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="desc-textarea">Description / Symptoms</label>
+                                    <textarea class="form-textarea" id="desc-textarea" placeholder="e.g. Animal is limping and has mouth sores..."></textarea>
+                                </div>
+                                
+                                <button type="submit" class="submit-btn" id="submit-btn">
+                                    <span class="spinner" id="btn-spinner"></span>
+                                    <span id="btn-text">Run AI Diagnosis</span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Right Results Column -->
+                        <div class="panel-body" style="padding: 0;">
+                            <label class="form-label">Diagnosis Output</label>
+                            
+                            <!-- Empty State -->
+                            <div class="result-empty" id="result-empty-state">
+                                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">🧬</div>
+                                <div style="font-weight: 500; color: var(--text-primary);">No Diagnosis Data</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">Upload an image or enter a Report ID, then click Run AI Diagnosis to analyze.</div>
+                            </div>
+
+                            <!-- Results Container -->
+                            <div id="result-display-container" style="display: none;">
+                                <div class="result-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);" id="result-animal-type">Cattle</div>
+                                    <div class="result-badge" id="result-valid-badge">Valid Animal Image</div>
+                                </div>
+
+                                <div id="result-diseases-list">
+                                    <!-- Card placeholders filled by JS -->
+                                </div>
+
+                                <div style="margin-top: 1.5rem;">
+                                    <div class="section-title">Raw API Response</div>
+                                    <pre class="code-block" id="result-raw-json" style="color: #34d399; font-size: 0.8rem; max-height: 250px; overflow-y: auto; margin-bottom: 0;"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -665,6 +986,186 @@
             const isLight = document.documentElement.classList.contains('light-mode');
             updateThemeUI(isLight);
         });
+
+        // Tab switching logic
+        function switchTab(tabName) {
+            const logsTab = document.getElementById('tab-logs');
+            const testTab = document.getElementById('tab-test');
+            const logsContent = document.getElementById('content-logs');
+            const testContent = document.getElementById('content-test');
+
+            if (tabName === 'logs') {
+                logsTab.classList.add('active');
+                testTab.classList.remove('active');
+                logsContent.style.display = 'block';
+                testContent.style.display = 'none';
+            } else {
+                logsTab.classList.remove('active');
+                testTab.classList.add('active');
+                logsContent.style.display = 'none';
+                testContent.style.display = 'block';
+                setupDragAndDrop();
+            }
+        }
+
+        // Drag & Drop event setup
+        let selectedFile = null;
+        
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            if (!dropZone) return;
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-over');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    selectedFile = files[0];
+                    showPreview(selectedFile);
+                }
+            }, false);
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                selectedFile = files[0];
+                showPreview(selectedFile);
+            }
+        }
+
+        function showPreview(file) {
+            const preview = document.getElementById('image-preview');
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Run diagnosis API request
+        async function runDiagnosis(event) {
+            event.preventDefault();
+
+            const reportId = document.getElementById('report-id-input').value.trim();
+            const lang = document.getElementById('lang-select').value;
+            const description = document.getElementById('desc-textarea').value.trim();
+
+            if (!selectedFile && !reportId) {
+                alert('Please upload an image or provide a LAHIS Report ID.');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submit-btn');
+            const spinner = document.getElementById('btn-spinner');
+            const btnText = document.getElementById('btn-text');
+            const resultEmpty = document.getElementById('result-empty-state');
+            const resultDisplay = document.getElementById('result-display-container');
+
+            // Set loading state
+            submitBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.innerText = 'Analyzing animal...';
+
+            const formData = new FormData();
+            formData.append('lang', lang);
+            if (selectedFile) formData.append('image', selectedFile);
+            if (reportId) formData.append('report_id', reportId);
+            if (description) formData.append('description', description);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to analyze animal.');
+                }
+
+                const result = await response.json();
+                
+                // Render results UI
+                resultEmpty.style.display = 'none';
+                resultDisplay.style.display = 'block';
+
+                document.getElementById('result-animal-type').innerText = result.animal_type || 'Unknown';
+                
+                const validBadge = document.getElementById('result-valid-badge');
+                if (result.is_valid_animal_image) {
+                    validBadge.innerText = 'Valid Animal Image';
+                    validBadge.classList.remove('invalid');
+                } else {
+                    validBadge.innerText = result.invalid_reason || 'Invalid Image';
+                    validBadge.classList.add('invalid');
+                }
+
+                // Render diseases list
+                const list = document.getElementById('result-diseases-list');
+                list.innerHTML = '';
+
+                if (result.diseases && result.diseases.length > 0) {
+                    result.diseases.forEach(d => {
+                        const score = Math.round(d.confidence * 100);
+                        let badgeColor = '#ef4444'; // Red
+                        let badgeBg = 'rgba(239, 68, 68, 0.15)';
+                        if (score >= 70) {
+                            badgeColor = '#34d399'; // Green
+                            badgeBg = 'rgba(52, 211, 153, 0.15)';
+                        } else if (score >= 40) {
+                            badgeColor = '#fbbf24'; // Orange/Yellow
+                            badgeBg = 'rgba(251, 191, 36, 0.15)';
+                        }
+
+                        list.innerHTML += `
+                            <div class="disease-card">
+                                <div class="disease-card-header">
+                                    <span class="disease-name">${d.name}</span>
+                                    <span class="disease-confidence" style="color: ${badgeColor}; background: ${badgeBg};">${score}% Confidence</span>
+                                </div>
+                                <div style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;">
+                                    ${d.reasoning || ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    list.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                            No specific diseases identified.
+                        </div>
+                    `;
+                }
+
+                document.getElementById('result-raw-json').innerText = JSON.stringify(result, null, 2);
+                
+                // Refresh logs list instantly
+                fetchLogs();
+
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            } finally {
+                // Reset loading state
+                submitBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.innerText = 'Run AI Diagnosis';
+            }
+        }
 
         // Auto reload logs
         fetchLogs();

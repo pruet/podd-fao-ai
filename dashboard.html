@@ -688,6 +688,10 @@
                     <div class="stat-label">Avg Latency</div>
                     <div class="stat-value" id="stat-latency">0 ms</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-label">Est. Gemini Cost</div>
+                    <div class="stat-value" id="stat-cost">$0.0000</div>
+                </div>
             </div>
 
             <!-- Logs Panel -->
@@ -705,6 +709,7 @@
                                 <th>Status</th>
                                 <th>Latency (s)</th>
                                 <th>Client IP</th>
+                                <th>Est. Cost</th>
                                 <th>Target</th>
                             </tr>
                         </thead>
@@ -813,6 +818,24 @@
                 <div id="modal-images-wrapper" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.5rem;"></div>
             </div>
             
+            <div id="modal-cost-container" style="display: none; margin-bottom: 1.5rem;">
+                <div class="section-title">Gemini Token Usage & Cost</div>
+                <div class="code-block" style="display: flex; justify-content: space-around; text-align: center; color: var(--accent-color); font-weight: 500; font-size: 0.9rem; margin-bottom: 0;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Prompt Tokens</div>
+                        <span id="modal-prompt-tokens">0</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Output Tokens</div>
+                        <span id="modal-output-tokens">0</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Est. Cost</div>
+                        <span id="modal-estimated-cost">$0.00000</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="section-title">Request Parameters</div>
             <pre class="code-block" id="modal-request">{}</pre>
 
@@ -842,10 +865,16 @@
             }
         }
 
+        function getGeminiCost(log) {
+            const prompt_tokens = log.prompt_tokens || 0;
+            const output_tokens = log.output_tokens || 0;
+            return (prompt_tokens * 0.075 + output_tokens * 0.30) / 1000000;
+        }
+
         function renderLogs(logs) {
             const tbody = document.getElementById('logs-tbody');
             if (logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No requests logged yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No requests logged yet.</td></tr>';
                 return;
             }
 
@@ -862,10 +891,15 @@
                         target = `Report ID: ${log.request_params.report_id}`;
                     } else if (log.request_params.report && log.request_params.report.id) {
                         target = `Report ID: ${log.request_params.report.id}`;
+                    } else if (log.request_params.image_filenames && log.request_params.image_filenames.length > 0) {
+                        target = `Uploads: ${log.request_params.image_filenames.join(', ')}`;
                     } else if (log.request_params.image_filename) {
                         target = `Upload: ${log.request_params.image_filename}`;
                     }
                 }
+
+                const cost = getGeminiCost(log);
+                const costStr = cost > 0 ? `$${cost.toFixed(5)}` : '$0.00000';
 
                 return `
                     <tr onclick="openModal(${index})">
@@ -874,6 +908,7 @@
                         <td><span class="status-pill ${statusClass}">${log.status_code}</span></td>
                         <td>${log.latency.toFixed(3)}s</td>
                         <td>${log.client_ip}</td>
+                        <td><span style="font-family: monospace; font-weight: 600; color: var(--accent-color);">${costStr}</span></td>
                         <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${target}</td>
                     </tr>
                 `;
@@ -890,9 +925,12 @@
             const totalLatency = logs.reduce((sum, l) => sum + l.latency, 0);
             const avgLatency = ((totalLatency / total) * 1000).toFixed(0);
 
+            const totalCost = logs.reduce((sum, l) => sum + getGeminiCost(l), 0);
+
             document.getElementById('stat-total').innerText = total;
             document.getElementById('stat-success').innerText = `${successRate}%`;
             document.getElementById('stat-latency').innerText = `${avgLatency} ms`;
+            document.getElementById('stat-cost').innerText = `$${totalCost.toFixed(4)}`;
         }
 
         function openModal(index) {
@@ -923,6 +961,18 @@
                 imageContainer.style.display = 'block';
             } else {
                 imageContainer.style.display = 'none';
+            }
+
+            // Display tokens/cost if available
+            const costContainer = document.getElementById('modal-cost-container');
+            if (log.prompt_tokens !== undefined || log.output_tokens !== undefined) {
+                document.getElementById('modal-prompt-tokens').innerText = log.prompt_tokens || 0;
+                document.getElementById('modal-output-tokens').innerText = log.output_tokens || 0;
+                const cost = getGeminiCost(log);
+                document.getElementById('modal-estimated-cost').innerText = cost > 0 ? `$${cost.toFixed(5)}` : '$0.00000';
+                costContainer.style.display = 'block';
+            } else {
+                costContainer.style.display = 'none';
             }
 
             document.getElementById('modal-request').innerText = JSON.stringify(log.request_params, null, 2);

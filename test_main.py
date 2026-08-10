@@ -23,6 +23,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         # Mock Gemini Response
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
+        mock_response.usage_metadata = None
         mock_response.text = json.dumps({
             "is_valid_animal_image": True,
             "invalid_reason": None,
@@ -73,6 +74,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         # Mock Gemini Response
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
+        mock_response.usage_metadata = None
         mock_response.text = json.dumps({
             "is_valid_animal_image": True,
             "invalid_reason": None,
@@ -216,6 +218,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
+        mock_response.usage_metadata = None
         mock_response.text = json.dumps({
             "is_valid_animal_image": True,
             "invalid_reason": None,
@@ -312,6 +315,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
+        mock_response.usage_metadata = None
         mock_response.text = json.dumps({
             "is_valid_animal_image": True,
             "invalid_reason": None,
@@ -368,6 +372,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
     def test_image_logging_and_serving(self, mock_get_client):
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
+        mock_response.usage_metadata = None
         mock_response.text = json.dumps({
             "is_valid_animal_image": True,
             "invalid_reason": None,
@@ -421,6 +426,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
     def test_multiple_images_upload(self, mock_get_client):
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
+        mock_response.usage_metadata = None
         mock_response.text = json.dumps({
             "is_valid_animal_image": True,
             "invalid_reason": None,

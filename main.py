@@ -46,14 +46,20 @@ def init_db():
                 request_params TEXT,
                 response_body TEXT,
                 steps_json TEXT,
-                image_path TEXT
+                image_path TEXT,
+                prompt_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0
             )
         """)
-        # Run migration if image_path column is missing
+        # Run migrations if columns are missing
         cursor.execute("PRAGMA table_info(api_logs)")
         columns = [row[1] for row in cursor.fetchall()]
         if "image_path" not in columns:
             cursor.execute("ALTER TABLE api_logs ADD COLUMN image_path TEXT")
+        if "prompt_tokens" not in columns:
+            cursor.execute("ALTER TABLE api_logs ADD COLUMN prompt_tokens INTEGER DEFAULT 0")
+        if "output_tokens" not in columns:
+            cursor.execute("ALTER TABLE api_logs ADD COLUMN output_tokens INTEGER DEFAULT 0")
         conn.commit()
         conn.close()
     except Exception as e:
@@ -80,7 +86,7 @@ def authenticate_dashboard(credentials: HTTPBasicCredentials = Depends(security)
         )
     return credentials.username
 
-def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str, steps_json: Optional[dict] = None, image_path: Optional[str] = None):
+def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str, steps_json: Optional[dict] = None, image_path: Optional[str] = None, prompt_tokens: int = 0, output_tokens: int = 0):
     def make_serializable(item):
         if isinstance(item, dict):
             return {k: make_serializable(v) for k, v in item.items()}
@@ -95,8 +101,8 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body, steps_json, image_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body, steps_json, image_path, prompt_tokens, output_tokens)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.utcnow().isoformat(),
             method,
@@ -107,7 +113,9 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
             json.dumps(make_serializable(request_params)),
             response_body,
             json.dumps(make_serializable(steps_json)) if steps_json else None,
-            image_path
+            image_path,
+            prompt_tokens,
+            output_tokens
         ))
         conn.commit()
         conn.close()
@@ -304,6 +312,8 @@ async def analyze_animal_image(
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
     saved_image_path = None
+    prompt_tokens = 0
+    output_tokens = 0
     
     # Initialize request_params early to prevent UnboundLocalError in exception handler
     request_params = {
@@ -477,10 +487,18 @@ async def analyze_animal_image(
             ),
         )
         print(f"[STEP 3] Response from Google AI: {response.text}")
+        prompt_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+        output_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
         result = json.loads(response.text)
         steps["step_3"] = {
             "title": "3. Response from Google AI",
-            "data": result
+            "data": {
+                "result": result,
+                "usage_metadata": {
+                    "prompt_tokens": prompt_tokens,
+                    "output_tokens": output_tokens
+                }
+            }
         }
         
         # If it was a webhook, post the feedback comment back to LAHIS
@@ -540,7 +558,9 @@ async def analyze_animal_image(
                     request_params=request_params,
                     response_body=json.dumps({"detail": e.detail}),
                     steps_json=steps,
-                    image_path=saved_image_path
+                    image_path=saved_image_path,
+                    prompt_tokens=prompt_tokens,
+                    output_tokens=output_tokens
                 )
                 raise e
         
@@ -555,7 +575,9 @@ async def analyze_animal_image(
             request_params=request_params,
             response_body=json.dumps(result),
             steps_json=steps,
-            image_path=saved_image_path
+            image_path=saved_image_path,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens
         )
         return result
 
@@ -572,7 +594,9 @@ async def analyze_animal_image(
             request_params=request_params,
             response_body=json.dumps({"detail": e.detail}),
             steps_json=steps,
-            image_path=saved_image_path
+            image_path=saved_image_path,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens
         )
         raise e
     except Exception as e:
@@ -586,7 +610,9 @@ async def analyze_animal_image(
             request_params=request_params,
             response_body=json.dumps({"detail": str(e)}),
             steps_json=steps,
-            image_path=saved_image_path
+            image_path=saved_image_path,
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens
         )
         raise HTTPException(status_code=500, detail=f"Error generating analysis: {str(e)}")
 
@@ -621,7 +647,9 @@ async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboa
                 "request_params": json.loads(row["request_params"]),
                 "response_body": row["response_body"],
                 "steps_json": json.loads(row["steps_json"]) if ("steps_json" in row.keys() and row["steps_json"]) else None,
-                "image_path": row["image_path"] if ("image_path" in row.keys() and row["image_path"]) else None
+                "image_path": row["image_path"] if ("image_path" in row.keys() and row["image_path"]) else None,
+                "prompt_tokens": row["prompt_tokens"] if "prompt_tokens" in row.keys() else 0,
+                "output_tokens": row["output_tokens"] if "output_tokens" in row.keys() else 0
             })
         return logs
     except Exception as e:

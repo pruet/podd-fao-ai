@@ -703,7 +703,7 @@
                     <div class="stat-value" id="stat-latency">0 ms</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Est. Gemini Cost</div>
+                    <div class="stat-label">Total Est. Cost</div>
                     <div class="stat-value" id="stat-cost">$0.0000</div>
                 </div>
             </div>
@@ -723,7 +723,7 @@
                                 <th>Status</th>
                                 <th>Latency (s)</th>
                                 <th>Client IP</th>
-                                <th>Est. Cost</th>
+                                <th>Query Cost</th>
                                 <th>Target</th>
                             </tr>
                         </thead>
@@ -800,9 +800,14 @@
 
                             <!-- Results Container -->
                             <div id="result-display-container" style="display: none;">
-                                <div class="result-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
-                                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);" id="result-animal-type">Cattle</div>
-                                    <div class="result-badge" id="result-valid-badge">Valid Animal Image</div>
+                                <div class="result-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                                    <div>
+                                        <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);" id="result-animal-type">Cattle</div>
+                                        <div class="result-badge" id="result-valid-badge">Valid Animal Image</div>
+                                    </div>
+                                    <div id="result-query-cost-badge" style="background: rgba(99, 102, 241, 0.12); border: 1px solid var(--accent-color); color: var(--accent-color); padding: 6px 12px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; font-weight: 600;">
+                                        Query Cost: <span id="result-query-cost-val">$0.00000</span>
+                                    </div>
                                 </div>
 
                                 <div id="result-diseases-list">
@@ -833,7 +838,7 @@
             </div>
             
             <div id="modal-cost-container" style="display: none; margin-bottom: 1.5rem;">
-                <div class="section-title">Gemini Token Usage & Cost</div>
+                <div class="section-title">Query Cost & Token Usage</div>
                 <div class="code-block" style="display: flex; justify-content: space-around; text-align: center; color: var(--accent-color); font-weight: 500; font-size: 0.9rem; margin-bottom: 0;">
                     <div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Prompt Tokens</div>
@@ -844,8 +849,8 @@
                         <span id="modal-output-tokens">0</span>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Est. Cost</div>
-                        <span id="modal-estimated-cost">$0.00000</span>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Query Cost</div>
+                        <span id="modal-estimated-cost" style="font-weight: 700; color: #34d399;">$0.00000</span>
                     </div>
                 </div>
             </div>
@@ -923,6 +928,9 @@
 
                 const cost = log ? getGeminiCost(log) : 0;
                 const costStr = cost > 0 ? `$${cost.toFixed(5)}` : '$0.00000';
+                const promptTok = (log && log.prompt_tokens) || 0;
+                const outputTok = (log && log.output_tokens) || 0;
+                const costTitle = `Query Cost: ${costStr} (Prompt: ${promptTok} tokens, Output: ${outputTok} tokens)`;
 
                 let sourceBadge = '';
                 if (log && log.request_params && log.request_params.source === 'web-tester') {
@@ -941,7 +949,9 @@
                         <td><span class="status-pill ${statusClass}">${statusCode}</span></td>
                         <td>${latencyNum.toFixed(3)}s</td>
                         <td>${(log && log.client_ip) || 'Unknown'}</td>
-                        <td><span style="font-family: monospace; font-weight: 600; color: var(--accent-color);">${costStr}</span></td>
+                        <td title="${costTitle}">
+                            <span style="font-family: monospace; font-weight: 600; color: var(--accent-color); background: rgba(99, 102, 241, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-block;">${costStr}</span>
+                        </td>
                         <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${target}</td>
                     </tr>
                 `;
@@ -1273,8 +1283,13 @@
 
                 document.getElementById('result-raw-json').innerText = JSON.stringify(result, null, 2);
                 
-                // Refresh logs list instantly
-                fetchLogs();
+                // Refresh logs list instantly and update query cost badge
+                await fetchLogs();
+                if (currentLogs && currentLogs.length > 0) {
+                    const latestLog = currentLogs[0];
+                    const queryCost = getGeminiCost(latestLog);
+                    document.getElementById('result-query-cost-val').innerText = queryCost > 0 ? `$${queryCost.toFixed(5)}` : '$0.00000';
+                }
 
             } catch (err) {
                 alert(`Error: ${err.message}`);

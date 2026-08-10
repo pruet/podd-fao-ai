@@ -482,6 +482,13 @@
             <button class="close-btn" onclick="closeModal(event)">&times;</button>
             <h2 class="modal-title">Request Details</h2>
             
+            <div id="modal-image-container" style="display: none; margin-bottom: 1.5rem;">
+                <div class="section-title">Analyzed Image</div>
+                <div style="text-align: center; margin-top: 0.5rem;">
+                    <img id="modal-image" src="" alt="Analyzed Animal" style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid var(--border-color); object-fit: contain;">
+                </div>
+            </div>
+            
             <div class="section-title">Request Parameters</div>
             <pre class="code-block" id="modal-request">{}</pre>
 
@@ -567,6 +574,18 @@
         function openModal(index) {
             const log = currentLogs[index];
             if (!log) return;
+
+            // Display image if available
+            const imageContainer = document.getElementById('modal-image-container');
+            const modalImage = document.getElementById('modal-image');
+            if (log.image_path) {
+                const filename = log.image_path.split('/').pop();
+                modalImage.src = `/api/logs/image/${filename}`;
+                imageContainer.style.display = 'block';
+            } else {
+                modalImage.src = '';
+                imageContainer.style.display = 'none';
+            }
 
             document.getElementById('modal-request').innerText = JSON.stringify(log.request_params, null, 2);
             

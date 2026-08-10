@@ -4,7 +4,7 @@ import hmac
 import hashlib
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 from typing import List
@@ -17,10 +17,11 @@ from dotenv import load_dotenv
 import sqlite3
 import time
 from datetime import datetime
+import uuid
 
 load_dotenv()
 
-DB_PATH = "/tmp/api_logs.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_logs.db")
 
 def init_db():
     try:
@@ -37,9 +38,15 @@ def init_db():
                 client_ip TEXT,
                 request_params TEXT,
                 response_body TEXT,
-                steps_json TEXT
+                steps_json TEXT,
+                image_path TEXT
             )
         """)
+        # Run migration if image_path column is missing
+        cursor.execute("PRAGMA table_info(api_logs)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "image_path" not in columns:
+            cursor.execute("ALTER TABLE api_logs ADD COLUMN image_path TEXT")
         conn.commit()
         conn.close()
     except Exception as e:
@@ -66,7 +73,7 @@ def authenticate_dashboard(credentials: HTTPBasicCredentials = Depends(security)
         )
     return credentials.username
 
-def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str, steps_json: Optional[dict] = None):
+def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str, steps_json: Optional[dict] = None, image_path: Optional[str] = None):
     def make_serializable(item):
         if isinstance(item, dict):
             return {k: make_serializable(v) for k, v in item.items()}
@@ -81,8 +88,8 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body, steps_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body, steps_json, image_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datetime.utcnow().isoformat(),
             method,
@@ -92,12 +99,14 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
             client_ip,
             json.dumps(make_serializable(request_params)),
             response_body,
-            json.dumps(make_serializable(steps_json)) if steps_json else None
+            json.dumps(make_serializable(steps_json)) if steps_json else None,
+            image_path
         ))
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"Error logging to DB: {e}")
+
 
 def load_config():
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
@@ -288,6 +297,7 @@ async def analyze_animal_image(
 ):
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
+    saved_image_path = None
     
     # Initialize request_params early to prevent UnboundLocalError in exception handler
     request_params = {
@@ -388,6 +398,22 @@ async def analyze_animal_image(
             pil_image = Image.open(io.BytesIO(image_bytes))
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to parse retrieved image: {str(e)}")
+        
+        # Save image to logs/images/
+        if image_bytes:
+            try:
+                images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "images")
+                os.makedirs(images_dir, exist_ok=True)
+                ext = ".jpg"
+                if pil_image.format:
+                    ext = f".{pil_image.format.lower()}"
+                saved_image_filename = f"{uuid.uuid4()}{ext}"
+                target_path = os.path.join(images_dir, saved_image_filename)
+                with open(target_path, "wb") as f:
+                    f.write(image_bytes)
+                saved_image_path = f"logs/images/{saved_image_filename}"
+            except Exception as e:
+                print(f"Error saving image to logs: {e}")
         
         # Get initialized Gemini Client
         genai_client = get_genai_client()
@@ -498,7 +524,8 @@ async def analyze_animal_image(
                     client_ip=client_ip,
                     request_params=request_params,
                     response_body=json.dumps({"detail": e.detail}),
-                    steps_json=steps
+                    steps_json=steps,
+                    image_path=saved_image_path
                 )
                 raise e
         
@@ -512,7 +539,8 @@ async def analyze_animal_image(
             client_ip=client_ip,
             request_params=request_params,
             response_body=json.dumps(result),
-            steps_json=steps
+            steps_json=steps,
+            image_path=saved_image_path
         )
         return result
 
@@ -528,7 +556,8 @@ async def analyze_animal_image(
             client_ip=client_ip,
             request_params=request_params,
             response_body=json.dumps({"detail": e.detail}),
-            steps_json=steps
+            steps_json=steps,
+            image_path=saved_image_path
         )
         raise e
     except Exception as e:
@@ -541,7 +570,8 @@ async def analyze_animal_image(
             client_ip=client_ip,
             request_params=request_params,
             response_body=json.dumps({"detail": str(e)}),
-            steps_json=steps
+            steps_json=steps,
+            image_path=saved_image_path
         )
         raise HTTPException(status_code=500, detail=f"Error generating analysis: {str(e)}")
 
@@ -575,11 +605,22 @@ async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboa
                 "client_ip": row["client_ip"],
                 "request_params": json.loads(row["request_params"]),
                 "response_body": row["response_body"],
-                "steps_json": json.loads(row["steps_json"]) if ("steps_json" in row.keys() and row["steps_json"]) else None
+                "steps_json": json.loads(row["steps_json"]) if ("steps_json" in row.keys() and row["steps_json"]) else None,
+                "image_path": row["image_path"] if ("image_path" in row.keys() and row["image_path"]) else None
             })
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch logs: {str(e)}")
+
+@app.get("/api/logs/image/{filename}")
+async def get_log_image(filename: str, username: str = Depends(authenticate_dashboard)):
+    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "images")
+    file_path = os.path.join(images_dir, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(file_path)
 
 if __name__ == "__main__":
     import uvicorn

@@ -10,7 +10,7 @@ import os
 # Ensure Src is in sys.path
 sys.path.append(os.path.dirname(__file__))
 
-from main import app, get_genai_client, init_db
+from main import app, get_genai_client, init_db, DB_PATH
 
 class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -284,7 +284,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(response.status_code, 401)
         
-        conn = sqlite3.connect("/tmp/api_logs.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM api_logs WHERE status_code = 401 ORDER BY id DESC LIMIT 1")
         row = cursor.fetchone()
@@ -363,6 +363,59 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             )
             
         self.assertEqual(response.status_code, 200)
+
+    @patch("main.get_genai_client")
+    def test_image_logging_and_serving(self, mock_get_client):
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "is_valid_animal_image": True,
+            "invalid_reason": None,
+            "animal_type": "Cattle",
+            "diseases": []
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+
+        image_data = io.BytesIO(b"fake image data")
+        with patch("main.Image.open") as mock_image_open:
+            mock_img = MagicMock()
+            mock_img.format = "PNG"
+            mock_image_open.return_value = mock_img
+            
+            response = self.client.post(
+                "/analyze",
+                files={"image": ("test.png", image_data, "image/png")},
+                data={"lang": "en", "description": "test image logging"}
+            )
+            
+        self.assertEqual(response.status_code, 200)
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT image_path FROM api_logs ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        self.assertIsNotNone(row)
+        saved_path = row[0]
+        self.assertIsNotNone(saved_path)
+        self.assertTrue(saved_path.startswith("logs/images/"))
+        
+        src_dir = os.path.dirname(__file__)
+        full_image_path = os.path.join(src_dir, saved_path)
+        self.assertTrue(os.path.exists(full_image_path))
+        
+        filename = saved_path.split("/")[-1]
+        auth_headers = {"Authorization": "Basic YWRtaW46YWRtaW4="}
+        image_response = self.client.get(f"/api/logs/image/{filename}", headers=auth_headers)
+        self.assertEqual(image_response.status_code, 200)
+        self.assertEqual(image_response.content, b"fake image data")
+        
+        try:
+            os.remove(full_image_path)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     unittest.main()

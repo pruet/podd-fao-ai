@@ -47,7 +47,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             
             response = self.client.post(
                 "/analyze",
-                files={"image": ("test.jpg", image_data, "image/jpeg")},
+                files={"images": ("test.jpg", image_data, "image/jpeg")},
                 data={"lang": "en", "description": "Limping cow"}
             )
             
@@ -59,16 +59,16 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
 
     @patch("main.get_genai_client")
     @patch("main.get_lahis_token", new_callable=AsyncMock)
-    @patch("main.fetch_lahis_report_image", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_images", new_callable=AsyncMock)
     @patch.dict(os.environ, {
         "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
         "LAHIS_CLIENT_ID": "mock_client",
         "LAHIS_CLIENT_SECRET": "mock_secret"
     })
-    def test_analyze_lahis_report_id(self, mock_fetch_image, mock_get_token, mock_get_client):
+    def test_analyze_lahis_report_id(self, mock_fetch_images, mock_get_token, mock_get_client):
         # Mock token & image retrieval
         mock_get_token.return_value = "mock_access_token"
-        mock_fetch_image.return_value = b"mock image bytes"
+        mock_fetch_images.return_value = [b"mock image bytes"]
         
         # Mock Gemini Response
         mock_genai_client = MagicMock()
@@ -105,7 +105,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         
         # Verify LAHIS functions were called
         mock_get_token.assert_called_once_with("mock_client", "mock_secret", "https://demo.api.lahis.ohtk.org")
-        mock_fetch_image.assert_called_once_with("12345", "mock_access_token", "https://demo.api.lahis.ohtk.org")
+        mock_fetch_images.assert_called_once_with("12345", "mock_access_token", "https://demo.api.lahis.ohtk.org")
 
     def test_analyze_missing_parameters(self):
         # Call without image or report_id
@@ -114,7 +114,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             data={"lang": "en"}
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Either image file or report_id must be provided.", response.json()["detail"])
+        self.assertIn("Either image files or report_id must be provided.", response.json()["detail"])
 
     @patch("httpx.AsyncClient")
     async def test_get_lahis_token_logic(self, mock_client_class):
@@ -139,8 +139,8 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs["data"]["client_id"], "my_client")
 
     @patch("httpx.AsyncClient")
-    async def test_fetch_lahis_report_image_logic(self, mock_client_class):
-        from main import fetch_lahis_report_image
+    async def test_fetch_lahis_report_images_logic(self, mock_client_class):
+        from main import fetch_lahis_report_images
         mock_client = MagicMock()
         
         # Mock responses
@@ -164,8 +164,8 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         mock_client.get = AsyncMock(side_effect=[mock_report_response, mock_img_response])
         mock_client_class.return_value.__aenter__.return_value = mock_client
         
-        content = await fetch_lahis_report_image("123", "tokenabc", "https://demo.api.lahis.ohtk.org")
-        self.assertEqual(content, b"fake-downloaded-bytes")
+        content = await fetch_lahis_report_images("123", "tokenabc", "https://demo.api.lahis.ohtk.org")
+        self.assertEqual(content, [b"fake-downloaded-bytes"])
         
         # Verify GET calls
         self.assertEqual(mock_client.get.call_count, 2)
@@ -202,7 +202,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
 
     @patch("main.get_genai_client")
     @patch("main.get_lahis_token", new_callable=AsyncMock)
-    @patch("main.fetch_lahis_report_image", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_images", new_callable=AsyncMock)
     @patch("main.submit_lahis_comment", new_callable=AsyncMock)
     @patch.dict(os.environ, {
         "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
@@ -210,9 +210,9 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         "LAHIS_CLIENT_SECRET": "mock_secret",
         "LAHIS_SIGNING_SECRET": ""
     })
-    def test_analyze_webhook_json(self, mock_submit_comment, mock_fetch_image, mock_get_token, mock_get_client):
+    def test_analyze_webhook_json(self, mock_submit_comment, mock_fetch_images, mock_get_token, mock_get_client):
         mock_get_token.return_value = "mock_access_token"
-        mock_fetch_image.return_value = b"mock image bytes"
+        mock_fetch_images.return_value = [b"mock image bytes"]
         
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
@@ -295,7 +295,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
 
     @patch("main.get_genai_client")
     @patch("main.get_lahis_token", new_callable=AsyncMock)
-    @patch("main.fetch_lahis_report_image", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_images", new_callable=AsyncMock)
     @patch("main.submit_lahis_comment", new_callable=AsyncMock)
     @patch.dict(os.environ, {
         "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
@@ -303,12 +303,12 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         "LAHIS_CLIENT_SECRET": "mock_secret",
         "LAHIS_SIGNING_SECRET": "my_secret_key"
     })
-    def test_webhook_signature_with_trailing_slash(self, mock_submit_comment, mock_fetch_image, mock_get_token, mock_get_client):
+    def test_webhook_signature_with_trailing_slash(self, mock_submit_comment, mock_fetch_images, mock_get_token, mock_get_client):
         import hmac
         import hashlib
         
         mock_get_token.return_value = "mock_access_token"
-        mock_fetch_image.return_value = b"mock image bytes"
+        mock_fetch_images.return_value = [b"mock image bytes"]
         
         mock_genai_client = MagicMock()
         mock_response = MagicMock()
@@ -385,7 +385,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             
             response = self.client.post(
                 "/analyze",
-                files={"image": ("test.png", image_data, "image/png")},
+                files={"images": ("test.png", image_data, "image/png")},
                 data={"lang": "en", "description": "test image logging"}
             )
             
@@ -416,6 +416,58 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             os.remove(full_image_path)
         except Exception:
             pass
+
+    @patch("main.get_genai_client")
+    def test_multiple_images_upload(self, mock_get_client):
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "is_valid_animal_image": True,
+            "invalid_reason": None,
+            "animal_type": "Cattle",
+            "diseases": []
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+
+        image_data_1 = io.BytesIO(b"fake image data 1")
+        image_data_2 = io.BytesIO(b"fake image data 2")
+        with patch("main.Image.open") as mock_image_open:
+            mock_img = MagicMock()
+            mock_img.format = "PNG"
+            mock_image_open.return_value = mock_img
+            
+            response = self.client.post(
+                "/analyze",
+                files=[
+                    ("images", ("test1.png", image_data_1, "image/png")),
+                    ("images", ("test2.png", image_data_2, "image/png"))
+                ],
+                data={"lang": "en", "description": "test multiple images"}
+            )
+            
+        self.assertEqual(response.status_code, 200)
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT image_path FROM api_logs ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        
+        self.assertIsNotNone(row)
+        saved_path = row[0]
+        self.assertIsNotNone(saved_path)
+        # Verify it contains comma-separated paths
+        paths = saved_path.split(",")
+        self.assertEqual(len(paths), 2)
+        
+        # Clean up files
+        src_dir = os.path.dirname(__file__)
+        for p in paths:
+            try:
+                os.remove(os.path.join(src_dir, p))
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     unittest.main()

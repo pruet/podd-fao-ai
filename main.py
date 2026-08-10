@@ -173,7 +173,7 @@ async def get_lahis_token(client_id: str, client_secret: str, api_url: str) -> s
                 detail=f"Failed to authenticate with LAHIS server: {str(e)}"
             )
 
-async def fetch_lahis_report_image(report_id: str, token: str, api_url: str) -> bytes:
+async def fetch_lahis_report_images(report_id: str, token: str, api_url: str) -> List[bytes]:
     async with httpx.AsyncClient() as client:
         report_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/images"
         headers = {"Authorization": f"Bearer {token}"}
@@ -194,27 +194,26 @@ async def fetch_lahis_report_image(report_id: str, token: str, api_url: str) -> 
                 detail=f"No animal image found in LAHIS report {report_id}."
             )
             
-        first_image = images[0]
-        content_path = None
-        if isinstance(first_image, dict):
-            content_path = first_image.get("links", {}).get("content")
-            
-        if not content_path:
+        images_bytes = []
+        for img in images:
+            content_path = None
+            if isinstance(img, dict):
+                content_path = img.get("links", {}).get("content")
+            if content_path:
+                download_url = f"{api_url.rstrip('/')}{content_path}"
+                try:
+                    img_response = await client.get(download_url, headers=headers, timeout=20.0)
+                    img_response.raise_for_status()
+                    images_bytes.append(img_response.content)
+                except Exception as e:
+                    print(f"Failed to download image from {download_url}: {e}")
+                    
+        if not images_bytes:
             raise HTTPException(
                 status_code=404,
-                detail=f"No image download path found in LAHIS report {report_id}."
+                detail=f"No downloadable images found in LAHIS report {report_id}."
             )
-            
-        download_url = f"{api_url.rstrip('/')}{content_path}"
-        try:
-            img_response = await client.get(download_url, headers=headers, timeout=20.0)
-            img_response.raise_for_status()
-            return img_response.content
-        except Exception as e:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Failed to download image from {download_url}: {str(e)}"
-            )
+        return images_bytes
 
 def verify_webhook_signature(path: str, timestamp: str, raw_body: bytes, signature: str) -> bool:
     signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
@@ -297,7 +296,7 @@ async def submit_lahis_comment(report_id: str, event_id: str, body_text: str, co
 @app.post("/analyze", response_model=DiagnosisResponse)
 async def analyze_animal_image(
     request: Request,
-    image: Optional[UploadFile] = File(None, description="Image of the sick/diseased animal"),
+    images: Optional[List[UploadFile]] = File(None, description="Images of the sick/diseased animal"),
     report_id: Optional[str] = Form(None, description="LAHIS Report ID to fetch the image from"),
     description: Optional[str] = Form(None, description="Optional text description of signs/symptoms"),
     lang: str = Form("en", description="Language for response: 'en' (English), 'th' (Thai), 'lo' (Lao)")
@@ -311,7 +310,7 @@ async def analyze_animal_image(
         "lang": lang,
         "description": description,
         "report_id": report_id,
-        "image_filename": image.filename if image else None
+        "image_filenames": [img.filename for img in images] if images else []
     }
     steps = {
         "step_1": {
@@ -369,27 +368,29 @@ async def analyze_animal_image(
                 "lang": lang,
                 "description": description,
                 "report_id": report_id,
-                "image_filename": image.filename if image else None
+                "image_filenames": [img.filename for img in images] if images else []
             }
         steps["step_1"]["data"] = request_params
         print(f"[STEP 1] Request from LAHIS. Content-Type: {content_type}, is_json: {is_json}, params/body: {json.dumps(request_params)}")
         if lang not in ["en", "th", "lo"]:
             raise HTTPException(status_code=400, detail="Unsupported language. Supported languages are 'en', 'th', 'lo'.")
             
-        if not is_json and not image and not report_id:
-            raise HTTPException(status_code=400, detail="Either image file or report_id must be provided.")
+        if not is_json and not images and not report_id:
+            raise HTTPException(status_code=400, detail="Either image files or report_id must be provided.")
         
-        image_bytes = None
+        multiple_images_bytes = []
         api_url = os.getenv("TENANT_API_URL")
         client_id = os.getenv("LAHIS_CLIENT_ID")
         client_secret = os.getenv("LAHIS_CLIENT_SECRET")
         
-        if image and not is_json:
-            # Read image bytes
-            try:
-                image_bytes = await image.read()
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+        if images and not is_json:
+            for img in images:
+                try:
+                    data = await img.read()
+                    if data:
+                        multiple_images_bytes.append(data)
+                except Exception as e:
+                    raise HTTPException(status_code=400, detail=f"Invalid image file {img.filename}: {str(e)}")
         else:
             # Fetch image bytes from LAHIS API
             if not all([api_url, client_id, client_secret]):
@@ -399,28 +400,35 @@ async def analyze_animal_image(
                 )
                 
             token = await get_lahis_token(client_id, client_secret, api_url)
-            image_bytes = await fetch_lahis_report_image(report_id, token, api_url)
+            multiple_images_bytes = await fetch_lahis_report_images(report_id, token, api_url)
             
-        try:
-            pil_image = Image.open(io.BytesIO(image_bytes))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to parse retrieved image: {str(e)}")
+        pil_images = []
+        for i, img_bytes in enumerate(multiple_images_bytes):
+            try:
+                pil_img = Image.open(io.BytesIO(img_bytes))
+                pil_images.append(pil_img)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to parse image index {i}: {str(e)}")
         
-        # Save image to logs/images/
-        if image_bytes:
+        # Save images to logs/images/
+        saved_paths = []
+        for i, img_bytes in enumerate(multiple_images_bytes):
             try:
                 images_dir = os.path.join(LOGS_DIR, "images")
                 os.makedirs(images_dir, exist_ok=True)
                 ext = ".jpg"
-                if pil_image.format:
-                    ext = f".{pil_image.format.lower()}"
+                pil_img = pil_images[i]
+                if pil_img.format:
+                    ext = f".{pil_img.format.lower()}"
                 saved_image_filename = f"{uuid.uuid4()}{ext}"
                 target_path = os.path.join(images_dir, saved_image_filename)
                 with open(target_path, "wb") as f:
-                    f.write(image_bytes)
-                saved_image_path = f"logs/images/{saved_image_filename}"
+                    f.write(img_bytes)
+                saved_paths.append(f"logs/images/{saved_image_filename}")
             except Exception as e:
-                print(f"Error saving image to logs: {e}")
+                print(f"Error saving image {i} to logs: {e}")
+        if saved_paths:
+            saved_image_path = ",".join(saved_paths)
         
         # Get initialized Gemini Client
         genai_client = get_genai_client()
@@ -434,14 +442,14 @@ async def analyze_animal_image(
         guardrail_policy = config.get("guardrail_policy", "")
         
         prompt = f"""
-        Analyze the provided image and description.
+        Analyze the provided image(s) and description.
         
         Guardrail Policy:
         {guardrail_policy}
     
         Tasks (Execute ONLY if `is_valid_animal_image` is True):
         1. Identify the type of animal.
-        2. List up to three possible diseases affecting the animal in the image.
+        2. List up to three possible diseases affecting the animal in the image(s).
         3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.
         
         Constraints:
@@ -461,7 +469,7 @@ async def analyze_animal_image(
         # Run inference using gemini-3.5-flash
         response = genai_client.models.generate_content(
             model='gemini-3.5-flash',
-            contents=[pil_image, prompt],
+            contents=pil_images + [prompt],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 response_schema=DiagnosisResponse,

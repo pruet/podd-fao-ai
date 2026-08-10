@@ -731,10 +731,10 @@
                                     <label class="form-label">Animal Image</label>
                                     <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
                                         <div class="upload-area-icon">📸</div>
-                                        <div style="font-weight: 500; color: var(--text-primary);">Drag & Drop your image here</div>
+                                        <div style="font-weight: 500; color: var(--text-primary);">Drag & Drop your images here</div>
                                         <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">or click to browse from device</div>
-                                        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
-                                        <img id="image-preview" class="upload-preview" alt="Preview">
+                                        <input type="file" id="file-input" accept="image/*" multiple style="display: none;" onchange="handleFileSelect(event)">
+                                        <div id="previews-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem;"></div>
                                     </div>
                                 </div>
                                 
@@ -809,10 +809,8 @@
             <h2 class="modal-title">Request Details</h2>
             
             <div id="modal-image-container" style="display: none; margin-bottom: 1.5rem;">
-                <div class="section-title">Analyzed Image</div>
-                <div style="text-align: center; margin-top: 0.5rem;">
-                    <img id="modal-image" src="" alt="Analyzed Animal" style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid var(--border-color); object-fit: contain;">
-                </div>
+                <div class="section-title">Analyzed Images</div>
+                <div id="modal-images-wrapper" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.5rem;"></div>
             </div>
             
             <div class="section-title">Request Parameters</div>
@@ -903,13 +901,27 @@
 
             // Display image if available
             const imageContainer = document.getElementById('modal-image-container');
-            const modalImage = document.getElementById('modal-image');
+            const imagesWrapper = document.getElementById('modal-images-wrapper');
+            imagesWrapper.innerHTML = '';
             if (log.image_path) {
-                const filename = log.image_path.split('/').pop();
-                modalImage.src = `/api/logs/image/${filename}`;
+                const paths = log.image_path.split(',');
+                paths.forEach(p => {
+                    const filename = p.split('/').pop();
+                    if (filename) {
+                        const img = document.createElement('img');
+                        img.src = `/api/logs/image/${filename}`;
+                        img.alt = 'Analyzed Animal';
+                        img.style.maxWidth = '100%';
+                        img.style.maxHeight = '250px';
+                        img.style.borderRadius = '8px';
+                        img.style.border = '1px solid var(--border-color)';
+                        img.style.objectFit = 'contain';
+                        img.style.margin = '0.25rem';
+                        imagesWrapper.appendChild(img);
+                    }
+                });
                 imageContainer.style.display = 'block';
             } else {
-                modalImage.src = '';
                 imageContainer.style.display = 'none';
             }
 
@@ -1014,7 +1026,7 @@
         }
 
         // Drag & Drop event setup
-        let selectedFile = null;
+        let selectedFiles = [];
         
         function setupDragAndDrop() {
             const dropZone = document.getElementById('drop-zone');
@@ -1038,8 +1050,8 @@
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 if (files.length > 0) {
-                    selectedFile = files[0];
-                    showPreview(selectedFile);
+                    selectedFiles = Array.from(files);
+                    showPreviews(selectedFiles);
                 }
             }, false);
         }
@@ -1047,19 +1059,31 @@
         function handleFileSelect(event) {
             const files = event.target.files;
             if (files.length > 0) {
-                selectedFile = files[0];
-                showPreview(selectedFile);
+                selectedFiles = Array.from(files);
+                showPreviews(selectedFiles);
             }
         }
 
-        function showPreview(file) {
-            const preview = document.getElementById('image-preview');
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                preview.src = e.target.result;
-                preview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+        function showPreviews(files) {
+            const container = document.getElementById('previews-container');
+            container.innerHTML = '';
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'upload-preview';
+                    img.style.display = 'block';
+                    img.style.width = '80px';
+                    img.style.height = '80px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '8px';
+                    img.style.margin = '0.25rem';
+                    img.style.border = '1px solid var(--border-color)';
+                    container.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            });
         }
 
         // Run diagnosis API request
@@ -1070,8 +1094,8 @@
             const lang = document.getElementById('lang-select').value;
             const description = document.getElementById('desc-textarea').value.trim();
 
-            if (!selectedFile && !reportId) {
-                alert('Please upload an image or provide a LAHIS Report ID.');
+            if (selectedFiles.length === 0 && !reportId) {
+                alert('Please upload one or more images or provide a LAHIS Report ID.');
                 return;
             }
 
@@ -1088,7 +1112,11 @@
 
             const formData = new FormData();
             formData.append('lang', lang);
-            if (selectedFile) formData.append('image', selectedFile);
+            if (selectedFiles.length > 0) {
+                selectedFiles.forEach(file => {
+                    formData.append('images', file);
+                });
+            }
             if (reportId) formData.append('report_id', reportId);
             if (description) formData.append('description', description);
 

@@ -21,7 +21,14 @@ import uuid
 
 load_dotenv()
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_logs.db")
+IS_GAE = os.getenv("GAE_ENV") == "standard" or "GAE_SERVICE" in os.environ
+if IS_GAE:
+    DB_PATH = "/tmp/api_logs.db"
+    LOGS_DIR = "/tmp/logs"
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_logs.db")
+    LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+
 
 def init_db():
     try:
@@ -402,7 +409,7 @@ async def analyze_animal_image(
         # Save image to logs/images/
         if image_bytes:
             try:
-                images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "images")
+                images_dir = os.path.join(LOGS_DIR, "images")
                 os.makedirs(images_dir, exist_ok=True)
                 ext = ".jpg"
                 if pil_image.format:
@@ -616,7 +623,7 @@ async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboa
 async def get_log_image(filename: str, username: str = Depends(authenticate_dashboard)):
     if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
         raise HTTPException(status_code=400, detail="Invalid filename")
-    images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "images")
+    images_dir = os.path.join(LOGS_DIR, "images")
     file_path = os.path.join(images_dir, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Image not found")

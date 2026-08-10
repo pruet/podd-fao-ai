@@ -190,13 +190,13 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 401)
 
         # 2. Test authorized access (should return 200)
-        # We pass auth=("admin", "admin") which corresponds to local default settings in setUp/env
-        response = self.client.get("/", auth=("admin", "admin"))
+        # We pass auth=("admin", "PoddFaoSecure2026!") which corresponds to local default settings in setUp/env
+        response = self.client.get("/", auth=("admin", "PoddFaoSecure2026!"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/html", response.headers["content-type"])
         self.assertIn("FAO-PODD Diagnostics Dashboard", response.text)
 
-        response = self.client.get("/api/logs", auth=("admin", "admin"))
+        response = self.client.get("/api/logs", auth=("admin", "PoddFaoSecure2026!"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("application/json", response.headers["content-type"])
         self.toBeInstance = isinstance(response.json(), list)
@@ -412,7 +412,7 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(os.path.exists(full_image_path))
         
         filename = saved_path.split("/")[-1]
-        auth_headers = {"Authorization": "Basic YWRtaW46YWRtaW4="}
+        auth_headers = {"Authorization": "Basic YWRtaW46UG9kZEZhb1NlY3VyZTIwMjYh"}
         image_response = self.client.get(f"/api/logs/image/{filename}", headers=auth_headers)
         self.assertEqual(image_response.status_code, 200)
         self.assertEqual(image_response.content, b"fake image data")

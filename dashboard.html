@@ -295,6 +295,20 @@
             color: var(--danger-color);
         }
 
+        .tester-badge {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
         /* Modal Styles */
         .modal-overlay {
             position: fixed;
@@ -901,10 +915,18 @@
                 const cost = getGeminiCost(log);
                 const costStr = cost > 0 ? `$${cost.toFixed(5)}` : '$0.00000';
 
+                let sourceBadge = '';
+                if (log.request_params && log.request_params.source === 'web-tester') {
+                    sourceBadge = ' <span class="tester-badge">Tester</span>';
+                }
+
                 return `
                     <tr onclick="openModal(${index})">
                         <td>${timeStr}</td>
-                        <td><span style="font-weight: 600; color: var(--accent-color);">${log.method}</span></td>
+                        <td>
+                            <span style="font-weight: 600; color: var(--accent-color);">${log.method}</span>
+                            ${sourceBadge}
+                        </td>
                         <td><span class="status-pill ${statusClass}">${log.status_code}</span></td>
                         <td>${log.latency.toFixed(3)}s</td>
                         <td>${log.client_ip}</td>
@@ -1173,6 +1195,9 @@
             try {
                 const response = await fetch('/analyze', {
                     method: 'POST',
+                    headers: {
+                        'X-Source': 'web-tester'
+                    },
                     body: formData
                 });
 

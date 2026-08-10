@@ -84,7 +84,7 @@ security = HTTPBasic()
 
 def authenticate_dashboard(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = os.getenv("DASHBOARD_USERNAME", "admin")
-    correct_password = os.getenv("DASHBOARD_PASSWORD", "admin")
+    correct_password = os.getenv("DASHBOARD_PASSWORD", "PoddFaoSecure2026!")
     
     import secrets
     is_correct_username = secrets.compare_digest(credentials.username, correct_username)
@@ -355,7 +355,8 @@ async def analyze_animal_image(
         "lang": lang,
         "description": description,
         "report_id": report_id,
-        "image_filenames": [img.filename for img in images] if images else []
+        "image_filenames": [img.filename for img in images] if images else [],
+        "source": request.headers.get("x-source", "api")
     }
     steps = {
         "step_1": {
@@ -413,7 +414,8 @@ async def analyze_animal_image(
                 "lang": lang,
                 "description": description,
                 "report_id": report_id,
-                "image_filenames": [img.filename for img in images] if images else []
+                "image_filenames": [img.filename for img in images] if images else [],
+                "source": request.headers.get("x-source", "api")
             }
         steps["step_1"]["data"] = request_params
         print(f"[STEP 1] Request from LAHIS. Content-Type: {content_type}, is_json: {is_json}, params/body: {json.dumps(request_params)}")

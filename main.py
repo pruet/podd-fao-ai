@@ -170,7 +170,7 @@ def load_config():
 app = FastAPI(
     title="FAO-PODD Animal Disease Diagnosis API",
     description="Analyze animal images and descriptions to identify potential diseases.",
-    version="2.3.0"
+    version="2.4.0"
 )
 
 # Initialize GenAI Client

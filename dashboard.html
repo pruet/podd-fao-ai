@@ -378,6 +378,8 @@
             font-size: 0.85rem;
             color: var(--code-color);
             margin-bottom: 1.5rem;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         .theme-toggle-btn {
@@ -448,6 +450,9 @@
             grid-template-columns: 1.2fr 1.8fr;
             gap: 2rem;
             align-items: start;
+        }
+        .tester-grid > * {
+            min-width: 0;
         }
 
         @media (max-width: 900px) {

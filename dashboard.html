@@ -667,7 +667,7 @@
                 <div class="logo-icon">F</div>
                 <div class="logo-title">
                     <h1>FAO-PODD Diagnostics</h1>
-                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.4.1</span></p>
+                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.6.0</span></p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
@@ -684,6 +684,7 @@
         <!-- Tabs Navigation -->
         <div class="tabs-nav">
             <button class="tab-btn active" id="tab-logs" onclick="switchTab('logs')">Request Logs</button>
+            <button class="tab-btn" id="tab-cluster" onclick="switchTab('cluster')">Cluster Monitor</button>
             <button class="tab-btn" id="tab-test" onclick="switchTab('test')">Inference Tester</button>
         </div>
 
@@ -731,6 +732,73 @@
                             <!-- Filled by JS -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cluster Monitor Panel -->
+        <div id="content-cluster" style="display: none;">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Reports Recorded</div>
+                    <div class="stat-value" id="stat-cluster-reports">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Villages Monitored</div>
+                    <div class="stat-value" id="stat-cluster-villages">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Clusters Detected (>2 Weeks Duration)</div>
+                    <div class="stat-value" id="stat-cluster-active" style="background: linear-gradient(135deg, #f87171 0%, #ef4444 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Village Cluster Monitor</div>
+                    <button class="refresh-btn" onclick="fetchClusters()">Manual Refresh</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timeline Start</th>
+                                <th>Latest Report</th>
+                                <th>Village ID</th>
+                                <th>Village Name</th>
+                                <th>Timeline Span</th>
+                                <th>Cluster Status</th>
+                                <th>Report IDs</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clusters-tbody">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Cluster Detection Tester -->
+            <div class="panel" style="margin-top: 2rem;">
+                <div class="panel-header">
+                    <div class="panel-title">Cluster Detection Tester</div>
+                </div>
+                <div class="panel-body">
+                    <form id="cluster-tester-form" onsubmit="runClusterDetection(event)" style="max-width: 600px;">
+                        <div class="form-group">
+                            <label class="form-label" for="cluster-report-id">LAHIS Report ID</label>
+                            <input type="text" class="form-input" id="cluster-report-id" placeholder="e.g. 22222222-2222-2222-2222-222222222222" required>
+                        </div>
+                        <button type="submit" class="submit-btn" id="cluster-submit-btn">
+                            <span class="spinner" id="cluster-btn-spinner"></span>
+                            <span id="cluster-btn-text">Run Cluster Detection</span>
+                        </button>
+                    </form>
+                    <div id="cluster-test-result" style="margin-top: 1.5rem; display: none;">
+                        <div class="section-title">Detection Result</div>
+                        <pre class="code-block" id="cluster-test-json" style="color: #34d399; font-size: 0.85rem; max-height: 250px; overflow-y: auto;"></pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -889,7 +957,7 @@
         function getGeminiCost(log) {
             const prompt_tokens = log ? (log.prompt_tokens || 0) : 0;
             const output_tokens = log ? (log.output_tokens || 0) : 0;
-            const usd = (prompt_tokens * 0.075 + output_tokens * 0.30) / 1000000;
+            const usd = (prompt_tokens * 0.75 + output_tokens * 3.00) / 1000000;
             return usd * USD_TO_THB;
         }
 
@@ -927,6 +995,10 @@
                     } else if (log.request_params.image_filename) {
                         target = `Upload: ${log.request_params.image_filename}`;
                     }
+                }
+
+                if (log && log.path === '/detect-cluster') {
+                    target += ' <span style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 0.75rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-left: 4px;">Cluster Detect</span>';
                 }
 
                 const cost = log ? getGeminiCost(log) : 0;
@@ -1103,21 +1175,118 @@
         // Tab switching logic
         function switchTab(tabName) {
             const logsTab = document.getElementById('tab-logs');
+            const clusterTab = document.getElementById('tab-cluster');
             const testTab = document.getElementById('tab-test');
             const logsContent = document.getElementById('content-logs');
+            const clusterContent = document.getElementById('content-cluster');
             const testContent = document.getElementById('content-test');
+
+            [logsTab, clusterTab, testTab].forEach(t => t && t.classList.remove('active'));
+            [logsContent, clusterContent, testContent].forEach(c => c && (c.style.display = 'none'));
 
             if (tabName === 'logs') {
                 logsTab.classList.add('active');
-                testTab.classList.remove('active');
                 logsContent.style.display = 'block';
-                testContent.style.display = 'none';
+            } else if (tabName === 'cluster') {
+                clusterTab.classList.add('active');
+                clusterContent.style.display = 'block';
+                fetchClusters();
             } else {
-                logsTab.classList.remove('active');
                 testTab.classList.add('active');
-                logsContent.style.display = 'none';
                 testContent.style.display = 'block';
                 setupDragAndDrop();
+            }
+        }
+
+        let currentClustersData = null;
+
+        async function fetchClusters() {
+            try {
+                const response = await fetch('/api/clusters');
+                if (!response.ok) throw new Error('Network error');
+                const data = await response.json();
+                currentClustersData = data;
+                renderClusters(data);
+            } catch (err) {
+                console.error('Failed to fetch cluster data:', err);
+            }
+        }
+
+        function renderClusters(data) {
+            if (!data) return;
+            const stats = data.stats || {};
+            document.getElementById('stat-cluster-reports').innerText = stats.total_reports || 0;
+            document.getElementById('stat-cluster-villages').innerText = stats.unique_villages || 0;
+            document.getElementById('stat-cluster-active').innerText = stats.total_clusters || 0;
+
+            const tbody = document.getElementById('clusters-tbody');
+            const clusters = data.clusters || [];
+
+            if (clusters.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No village report clusters recorded yet.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = clusters.map(c => {
+                const isCluster = c.cluster_detected;
+                const statusBadge = isCluster
+                    ? '<span class="result-badge invalid" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.8rem; font-weight: 700; padding: 4px 10px;">🚨 CLUSTER DETECTED (>2 Weeks)</span>'
+                    : '<span class="result-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.8rem; font-weight: 600; padding: 4px 10px;">Monitoring (<=14 Days)</span>';
+
+                const reportIdsStr = (c.reports && c.reports.length > 0) ? c.reports.join(', ') : 'None';
+                const spanDaysStr = (c.span_days !== undefined) ? `${c.span_days} days` : '0 days';
+
+                return `
+                    <tr>
+                        <td style="font-weight: 600; color: var(--accent-color);">${c.start_date || 'N/A'}</td>
+                        <td style="font-weight: 500;">${c.latest_date || 'N/A'}</td>
+                        <td style="font-family: monospace;">${c.village_id}</td>
+                        <td style="font-weight: 500;">${c.village_name}</td>
+                        <td><span style="font-weight: 700; font-size: 1.05rem; color: ${isCluster ? '#ef4444' : 'var(--text-primary)'};">${spanDaysStr}</span> <span style="font-size: 0.8rem; color: var(--text-secondary);">(${c.report_count || 0} reports)</span></td>
+                        <td>${statusBadge}</td>
+                        <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);" title="${reportIdsStr}">${reportIdsStr}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function runClusterDetection(event) {
+            event.preventDefault();
+            const reportId = document.getElementById('cluster-report-id').value.trim();
+            if (!reportId) return;
+
+            const submitBtn = document.getElementById('cluster-submit-btn');
+            const spinner = document.getElementById('cluster-btn-spinner');
+            const btnText = document.getElementById('cluster-btn-text');
+            const resultBox = document.getElementById('cluster-test-result');
+            const resultJson = document.getElementById('cluster-test-json');
+
+            submitBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.innerText = 'Evaluating cluster...';
+
+            const formData = new FormData();
+            formData.append('report_id', reportId);
+
+            try {
+                const response = await fetch('/detect-cluster', {
+                    method: 'POST',
+                    headers: {'X-Source': 'web-tester'},
+                    body: formData
+                });
+
+                const resData = await response.json();
+                resultBox.style.display = 'block';
+                resultJson.innerText = JSON.stringify(resData, null, 2);
+
+                fetchClusters();
+                fetchLogs();
+            } catch (err) {
+                alert(`Cluster Detection Error: ${err.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                spinner.style.display = 'none';
+                btnText.innerText = 'Run Cluster Detection';
             }
         }
 
@@ -1304,9 +1473,15 @@
             }
         }
 
-        // Auto reload logs
+        // Auto reload logs and clusters
         fetchLogs();
-        setInterval(fetchLogs, 5000);
+        fetchClusters();
+        setInterval(() => {
+            fetchLogs();
+            if (document.getElementById('tab-cluster') && document.getElementById('tab-cluster').classList.contains('active')) {
+                fetchClusters();
+            }
+        }, 5000);
     </script>
 </body>
 </html>

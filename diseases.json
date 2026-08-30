@@ -1,0 +1,895 @@
+{
+  "Chicken": [
+    {
+      "name": "Avian influenza",
+      "name_lo": "ໄຂ້ຫວັດສັດປີກ",
+      "name_th": "ไข้หวัดนก",
+      "symptoms": [
+        "Sudden death",
+        "Fatigue, lethargy, hair loss, not eating",
+        "Tears, runny nose, sneezing",
+        "Swollen head and neck",
+        "Face, lips, and cheeks are red",
+        "Petechial hemorrhage / bleeding points",
+        "Paralysis",
+        "Severe bleeding in organs such as pancreas, stomach, intestines, bronchi, and tonsils",
+        "Respiratory tract inflammation with purulent discharge around nose and eyes",
+        "Edematous and bloody mucous membranes"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປີກທີ່ປ່ວຍອອກຈາກຝູງທັນທີ ແລະ ຫ້າມເຄື່ອນຍ້າຍສັດປີກເຂົ້າ-ອອກຈາກຟາມ",
+          "ຫ້າມຂ້າສັດປີກປ່ວຍກິນ, ຫ້າມຂາຍ ຫຼື ຖິ້ມຊາກລົງແຫຼ່ງນ້ຳ",
+          "ຂຸດຂຸມຝັງຊາກສັດປີກທີ່ຕາຍເລິກ 1.5 ແມັດຂຶ້ນໄປ ພ້ອມໂຮຍປູນຂາວ ຫຼື ຈູດທຳລາຍ",
+          "ສີດພົ່ນຢາຂ້າເຊື້ອ ຫຼື ໂຮຍປູນຂາວອ້ອມເລົ້າໄກ່ ແລະ ອຸປະກອນທຸກມື້",
+          "ຜູ້ລ້ຽງຕ້ອງໃສ່ຜ້າອັດປາກ-ດັງ ແລະ ຖົງມື ເພາະສາມາດຕິດຕໍ່ສູ່ຄົນໄດ້",
+          "ລາຍງານຫ້ອງການລ້ຽງສັດ ແລະ ການປະມົງຂັ້ນເມືອງທັນທີຜ່ານລະບົບ PODD"
+        ],
+        "th": [
+          "แยกสัตว์ปีกที่ป่วยออกจากฝูงทันที และห้ามเคลื่อนย้ายสัตว์ปีกเข้า-ออกจากฟาร์ม",
+          "ห้ามชำแหละสัตว์ปีกป่วยกิน ห้ามจำหน่าย หรือทิ้งซากลงแหล่งน้ำ",
+          "ขุดหลุมฝังซากสัตว์ปีกที่ตายลึกอย่างน้อย 1.5 เมตร พร้อมโรยปูนขาว หรือเผาทำลาย",
+          "พ่นยาฆ่าเชื้อหรือโรยปูนขาวรอบเล้าไก่และอุปกรณ์ทุกวัน",
+          "ผู้เลี้ยงต้องสวมหน้ากากอนามัยและถุงมือ เพราะเป็นโรคติดต่อสู่คนได้",
+          "รายงานเจ้าหน้าที่ปศุสัตว์ในพื้นที่ทันทีผ่านระบบ PODD"
+        ],
+        "en": [
+          "Immediately isolate sick poultry and restrict all poultry movement in and out of the farm.",
+          "Do not slaughter sick birds for consumption, sell them, or discard carcasses into water bodies.",
+          "Bury dead poultry at least 1.5 meters deep covered with quicklime, or incinerate them.",
+          "Disinfect poultry sheds, surroundings, and equipment daily using disinfectant or quicklime.",
+          "Handlers must wear face masks and gloves as avian influenza is a zoonotic disease.",
+          "Report immediately to local veterinary authorities via the PODD system."
+        ]
+      }
+    },
+    {
+      "name": "Newcastle disease",
+      "name_lo": "ພະຍາດນິວຄາສເຊິລ (ພະຍາດຫ່າໄກ່)",
+      "name_th": "โรคนิวคาสเซิล (โรคห่าไก่)",
+      "symptoms": [
+        "Digestive / severe form: sudden illness in chickens of all ages, bleeding spots in intestines, green or yellow stools",
+        "Neurological form: twisted neck (torticollis), standing with head under chin, walking in circles and walking backwards, high mortality in first 2-3 days",
+        "Moderate / respiratory form: abnormal breathing sounds, coughing, sneezing",
+        "Mild form: digestive symptoms and green/yellow droppings"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກໄກ່ທີ່ສະແດງອາການຄໍບິດ ຫຼື ຖອກທ້ອງອອກໄວ້ຕ່າງຫາກ",
+          "ໃຫ້ຢາບຳລຸງ, ວິຕາມິນ ແລະ ເກືອແຮ່ປະສົມນ້ຳໃຫ້ໄກ່ທີ່ຍັງແຂງແຮງກິນເພື່ອເພີ່ມພູມຕ້ານທານ",
+          "ສີດພົ່ນຢາຂ້າເຊື້ອຄອກ ແລະ ເຄື່ອງມືລ້ຽງໄກ່ຢ່າງສະໝ່ຳສະເໝີ",
+          "ຝັງຊາກໄກ່ຕາຍໃຫ້ເລິກພ້ອມໂຮຍປູນຂາວ, ຫ້າມນຳໄປຂາຍ ຫຼື ບໍລິໂພກ",
+          "ວາງແຜນສີດວັກຊີນປ້ອງກັນໃຫ້ໄກ່ທີ່ຍັງມີສຸຂະພາບດີໃນຝູງ ແລະ ໄກ່ລຸ້ນໃໝ່"
+        ],
+        "th": [
+          "แยกไก่ที่แสดงอาการคอบิดหรือท้องเสียไว้ต่างหาก",
+          "ให้วิตามิน เกลือแร่ และสารอาหารบำรุงผสมน้ำให้ไก่ที่ยังแข็งแรงกินเพื่อเสริมภูมิคุ้มกัน",
+          "พ่นยาฆ่าเชื้อโรงเรือนและอุปกรณ์เลี้ยงไก่อย่างสม่ำเสมอ",
+          "ฝังซากไก่ตายให้ลึกพร้อมโรยปูนขาว ห้ามนำไปจำหน่ายหรือบริโภค",
+          "วางแผนฉีดวัคซีนป้องกันโรคนิวคาสเซิลให้กับไก่ที่ยังมีสุขภาพดีในฝูงและไก่รุ่นถัดไป"
+        ],
+        "en": [
+          "Isolate chickens showing torticollis (twisted neck) or diarrhea from the flock.",
+          "Provide supportive care: mix vitamins and electrolytes in drinking water for healthy birds to boost immunity.",
+          "Regularly disinfect coops, feeding troughs, and equipment.",
+          "Bury dead birds deep with lime; do not sell or consume them.",
+          "Plan Newcastle disease vaccination for healthy birds and new batches."
+        ]
+      }
+    },
+    {
+      "name": "Fowl Cholera",
+      "name_lo": "ພະຍາດອະຫິວາສັດປີກ (ພະຍາດເຕົ້າໂຮມເລືອດສັດປີກ)",
+      "name_th": "โรคอหิวาต์สัตว์ปีก",
+      "symptoms": [
+        "Peracute form: sudden death without prior clinical signs",
+        "Acute form: depression, pale purple combs and wattles, labored breathing / dyspnea, death within 2-3 days",
+        "Chronic form: facial and wattle swelling, noisy respiration, nasal discharge, torticollis, swollen joints"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປີກທີ່ປ່ວຍອອກທັນທີ",
+          "ໃຫ້ຢາຕ້ານເຊື້ອ (Antibiotics) ເຊັ່ນ Oxytetracycline ຫຼື Sulfa ປະສົມນ້ຳ ຫຼື ອາຫານໃຫ້ສັດປີກທັງຝູງຕາມຄຳແນະນຳ",
+          "ອະນາໄມ, ລ້າງຮາງນ້ຳ-ຮາງອາຫານ ແລະ ປ່ຽນວັດສະດຸຮອງພື້ນຄອກໃໝ່",
+          "ຂ້າເຊື້ອຄອກດ້ວຍປູນຂາວ ຫຼື ນ້ຳຢາຂ້າເຊື້ອ",
+          "ຝັງ ຫຼື ຈູດຊາກສັດປີກທີ່ຕາຍຢ່າງຖືກວິທີ"
+        ],
+        "th": [
+          "แยกสัตว์ปีกที่ป่วยออกทันที",
+          "ให้ยาปฏิชีวนะ เช่น ออกซีเตตราไซคลีน (Oxytetracycline) หรือซัลฟา ผสมน้ำหรืออาหารให้สัตว์ปีกทั้งฝูงตามคำแนะนำ",
+          "ทำความสะอาด ล้างรางน้ำ-รางอาหาร และเปลี่ยนวัสดุรองพื้นคอกใหม่",
+          "ฆ่าเชื้อโรงเรือนด้วยปูนขาวหรือน้ำยาฆ่าเชื้อ",
+          "ฝังลึกหรือเผาทำลายซากสัตว์ปีกที่ตายอย่างถูกสุขอนามัย"
+        ],
+        "en": [
+          "Immediately isolate sick birds showing facial swelling or respiratory distress.",
+          "Administer broad-spectrum antibiotics (e.g., Oxytetracycline or Sulfa) via water or feed to the whole flock.",
+          "Clean and sanitize waterers and feeders, and replace wet bedding material.",
+          "Disinfect pens and surrounding areas with quicklime or disinfectant.",
+          "Properly bury or incinerate dead birds."
+        ]
+      }
+    }
+  ],
+  "Goose and Duck": [
+    {
+      "name": "Avian influenza",
+      "name_lo": "ໄຂ້ຫວັດສັດປີກ",
+      "name_th": "ไข้หวัดนก",
+      "symptoms": [
+        "Sudden death",
+        "Fatigue, lethargy, ruffled feathers, loss of appetite",
+        "Tears, runny nose, sneezing",
+        "Swollen head and neck",
+        "Face, lips, and cheeks are red",
+        "Petechial hemorrhage / bleeding points",
+        "Paralysis",
+        "Severe internal bleeding in pancreas, stomach, intestines, bronchi, tonsils",
+        "Respiratory tract inflammation with purulent discharge around nose and eyes"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກເປັດ-ຫ່ານທີ່ປ່ວຍອອກຈາກຝູງ ແລະ ກັກບໍລິເວນບໍ່ໃຫ້ໄປຫຼິ້ນນ້ຳຮ່ວມກັບແຫຼ່ງນ້ຳທຳມະຊາດ",
+          "ຫ້າມນຳເປັດ-ຫ່ານປ່ວຍ ຫຼື ຕາຍໄປປຸງແຕ່ງອາຫານ, ຂາຍ ຫຼື ຖິ້ມລົງໜອງນ້ຳ",
+          "ຝັງຊາກເລິກຢ່າງໜ້ອຍ 1.5 ແມັດ ພ້ອມໂຮຍປູນຂາວ ຫຼື ຈູດທຳລາຍ",
+          "ໂຮຍປູນຂາວ ຫຼື ສີດຢາຂ້າເຊື້ອອ້ອມບໍລິເວນຄອກ ແລະ ແຄມໜອງ",
+          "ຜູ້ລ້ຽງຕ້ອງໃສ່ຜ້າອັດປາກ-ດັງ ແລະ ຖົງມື, ລ້າງມືໃຫ້ສະອາດຫຼັງສຳຜັດສັດ",
+          "ແຈ້ງສັດຕະວະແພດເມືອງທັນທີ"
+        ],
+        "th": [
+          "แยกเป็ด-ห่านที่ป่วยออกจากฝูง และกักบริเวณไม่ให้ลงเล่นน้ำร่วมกับแหล่งน้ำธรรมชาติ",
+          "ห้ามนำเป็ด-ห่านป่วยหรือตายไปประกอบอาหาร จำหน่าย หรือทิ้งลงหนองน้ำ",
+          "ฝังซากลึกอย่างน้อย 1.5 เมตร พร้อมโรยปูนขาว หรือเผาทำลาย",
+          "โรยปูนขาวหรือพ่นยาฆ่าเชื้อรอบคอกและริมแหล่งน้ำ",
+          "ผู้เลี้ยงต้องสวมหน้ากากอนามัยและถุงมือ ล้างมือให้สะอาดหลังสัมผัสสัตว์",
+          "แจ้งสัตวแพทย์ในพื้นที่ทันที"
+        ],
+        "en": [
+          "Isolate sick ducks/geese and prevent them from accessing shared natural water bodies.",
+          "Never consume, sell, or discard dead or sick birds into ponds or rivers.",
+          "Bury carcasses at least 1.5 meters deep covered with quicklime, or burn them.",
+          "Apply quicklime or spray disinfectant around housing and water areas.",
+          "Handlers must wear PPE (masks, gloves) and wash hands thoroughly.",
+          "Notify local veterinary authorities immediately."
+        ]
+      }
+    },
+    {
+      "name": "Newcastle disease",
+      "name_lo": "ພະຍາດນິວຄາສເຊິລ",
+      "name_th": "โรคนิวคาสเซิล",
+      "symptoms": [
+        "Intestinal form: sudden illness, bleeding spots in intestines, green or yellow droppings",
+        "Neurological form: twisted neck, standing with head tucked under, circling, walking backwards, high mortality",
+        "Respiratory form: abnormal breathing sounds, coughing"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປ່ວຍອອກຈາກຝູງ",
+          "ໃຫ້ນ້ຳສະອາດປະສົມວິຕາມິນ ແລະ ເກືອແຮ່ເພື່ອຟື້ນຟູຮ່າງກາຍ",
+          "ທຳຄວາມສະອາດ ແລະ ຂ້າເຊື້ອຄອກລ້ຽງດ້ວຍປູນຂາວ",
+          "ຝັງຊາກສັດຕາຍໃຫ້ເລິກເພື່ອປ້ອງກັນການແຜ່ກະຈາຍຂອງເຊື້ອ"
+        ],
+        "th": [
+          "แยกสัตว์ป่วยออกจากฝูง",
+          "ให้น้ำสะอาดผสมวิตามินและเกลือแร่เพื่อฟื้นฟูสุขภาพ",
+          "ทำความสะอาดและฆ่าเชื้อโรงเรือนด้วยปูนขาวหรือน้ำยาฆ่าเชื้อ",
+          "ฝังซากสัตว์ตายให้ลึกเพื่อป้องกันการแพร่กระจายของเชื้อโรค"
+        ],
+        "en": [
+          "Isolate sick birds showing neurological or digestive signs.",
+          "Provide clean drinking water supplemented with vitamins and electrolytes.",
+          "Clean and disinfect duck/goose pens using quicklime.",
+          "Bury dead birds deeply to prevent viral transmission."
+        ]
+      }
+    },
+    {
+      "name": "Fowl Cholera",
+      "name_lo": "ພະຍາດອະຫິວາສັດປີກ",
+      "name_th": "โรคอหิวาต์สัตว์ปีก",
+      "symptoms": [
+        "Peracute form: sudden death without clinical signs",
+        "Acute form: depression, pale purple / cyanotic combs and wattles, dyspnea, death in 2-3 days",
+        "Chronic form: swelling of face and wattles, noisy breathing, nasal discharge, torticollis, swollen joints"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດທີ່ສະແດງອາການໜ້າບວມ ຫຼື ຫາຍໃຈຝືດ",
+          "ໃຫ້ຢາປະຕິຊີວະນະ (Antibiotics) ປະສົມນ້ຳດື່ມໃຫ້ທັງຝູງໂດຍໄວ",
+          "ປ່ຽນແຫຼ່ງນ້ຳ ແລະ ອະນາໄມຮາງອາຫານທຸກມື້",
+          "ຂ້າເຊື້ອຄອກ ແລະ ບໍລິເວນອ້ອມຮອບ",
+          "ກຳຈັດຊາກສັດຕາຍໂດຍການຝັງເລິກພ້ອມໂຮຍປູນຂາວ"
+        ],
+        "th": [
+          "แยกสัตว์ที่แสดงอาการหน้าบวม หงอย หรือหายใจลำบาก",
+          "ให้ยาปฏิชีวนะผสมน้ำดื่มให้กับทั้งฝูงโดยเร็ว",
+          "เปลี่ยนแหล่งน้ำและทำความสะอาดรางอาหารทุกวัน",
+          "ฆ่าเชื้อโรงเรือนและบริเวณโดยรอบ",
+          "กำจัดซากสัตว์ตายด้วยการฝังลึกพร้อมโรยปูนขาว"
+        ],
+        "en": [
+          "Isolate birds with facial swelling or respiratory difficulty.",
+          "Administer oral antibiotics in drinking water to the whole flock promptly.",
+          "Provide fresh, uncontaminated water and clean feeding equipment daily.",
+          "Disinfect pens and surrounding premises.",
+          "Dispose of dead birds by deep burial with quicklime."
+        ]
+      }
+    },
+    {
+      "name": "Duck Plague",
+      "name_lo": "ພະຍາດກາບເປັດ (ໄຂ້ຫວັດລຳໄສ້ເປັດ)",
+      "name_th": "โรคกาบเป็ด (กาฬโรคเป็ด)",
+      "symptoms": [
+        "Depression, loss of appetite, high fever",
+        "Nasal discharge, ruffled feathers, closed eyelids, photophobia",
+        "Incoordination, tremors, recumbency with head and wings extended forward",
+        "Watery diarrhea",
+        "Subcutaneous edema of head and neck in young ducks",
+        "Petechial hemorrhages on legs and feet"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກເປັດປ່ວຍອອກທັນທີ ແລະ ຫ້າມປ່ອຍເປັດລົງແຫຼ່ງນ້ຳສາທາລະນະ",
+          "ໃຫ້ນ້ຳສະອາດປະສົມວິຕາມິນລະລາຍນ້ຳເພື່ອຊ່ວຍຫຼຸດຄວາມຕຶງຄຽດ",
+          "ອະນາໄມຄອກ ແລະ ໂຮຍປູນຂາວຂ້າເຊື້ອຢ່າງທົ່ວເຖິງ",
+          "ຝັງຊາກເປັດຕາຍໃຫ້ເລິກ ຫ້າມຖິ້ມຊາກລົງນ້ຳຢ່າງເດັດຂາດ",
+          "ສີດວັກຊີນປ້ອງກັນພະຍາດກາບເປັດໃຫ້ແກ່ເປັດທີ່ຍັງແຂງແຮງໃນພື້ນທີ່"
+        ],
+        "th": [
+          "แยกเป็ดป่วยออกทันที และห้ามปล่อยเป็ดลงแหล่งน้ำสาธารณะ",
+          "ให้น้ำสะอาดผสมวิตามินละลายน้ำเพื่อลดความเครียดและเสริมความแข็งแรง",
+          "ทำความสะอาดคอกและโรยปูนขาวฆ่าเชื้ออย่างทั่วถึง",
+          "ฝังซากเป็ดตายให้ลึก ห้ามทิ้งซากลงน้ำโดยเด็ดขาด",
+          "ฉีดวัคซีนป้องกันโรคกาบเป็ดให้กับเป็ดที่ยังแข็งแรงในพื้นที่"
+        ],
+        "en": [
+          "Immediately isolate sick ducks and keep them away from communal water sources.",
+          "Provide clean drinking water with soluble multivitamins to reduce stress.",
+          "Thoroughly clean pens and apply quicklime.",
+          "Bury dead ducks deeply; never dump carcasses into water.",
+          "Vaccinate healthy ducks in the area against Duck Viral Enteritis (Duck Plague)."
+        ]
+      }
+    }
+  ],
+  "Pig": [
+    {
+      "name": "Classical Swine Fever",
+      "name_lo": "ພະຍາດອະຫິວາໝູແບບດັ້ງເດີມ (CSF)",
+      "name_th": "โรคอหิวาต์สุกร (CSF)",
+      "symptoms": [
+        "High fever, profound lethargy, not eating",
+        "Upset stomach, vomiting, or diarrhea",
+        "Red skin rash, bleeding spots, petechiae",
+        "Abortion, stillbirth, premature birth in pregnant sows",
+        "Conjunctivitis, crusty red eyes",
+        "Hind leg weakness, ataxia, posterior paresis"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກໝູປ່ວຍອອກຈາກຄອກທັນທີ ແລະ ຫ້າມເຄື່ອນຍ້າຍໝູເຂົ້າ-ອອກ",
+          "ຫ້າມຂ້າໝູປ່ວຍຂາຍ ຫຼື ບໍລິໂພກ",
+          "ຂ້າເຊື້ອຄອກໝູ, ທາງຍ່າງ ແລະ ອຸປະກອນທັງໝົດດ້ວຍນ້ຳຢາຂ້າເຊື້ອ ຫຼື ປູນຂາວ",
+          "ຝັງຊາກໝູຕາຍເລິກ 1.5–2 ແມັດ ພ້ອມໂຮຍປູນຂາວທັບ",
+          "ແຈ້ງສັດຕະວະແພດບ້ານ/ເມືອງເພື່ອຕິດຕາມ ແລະ ວາງແຜນສີດວັກຊີນໃຫ້ໝູທີ່ຍັງດີ"
+        ],
+        "th": [
+          "แยกสุกรป่วยออกจากคอกทันที และห้ามเคลื่อนย้ายสุกรเข้า-ออกฟาร์ม",
+          "ห้ามชำแหละสุกรป่วยเพื่อจำหน่ายหรือบริโภค",
+          "ฆ่าเชื้อคอกสุกร ทางเดิน และอุปกรณ์ทั้งหมดด้วยน้ำยาฆ่าเชื้อหรือปูนขาว",
+          "ฝังซากสุกรตายลึก 1.5–2 เมตร พร้อมโรยปูนขาวทับ",
+          "แจ้งสัตวแพทย์ในพื้นที่เพื่อติดตามและวางแผนฉีดวัคซีนป้องกันให้สุกรที่ยังแข็งแรง"
+        ],
+        "en": [
+          "Immediately isolate sick pigs and halt all pig movement in and out of the farm.",
+          "Do not slaughter, sell, or consume sick pigs.",
+          "Disinfect pens, walkways, and feeding tools using disinfectant or quicklime.",
+          "Bury dead pigs 1.5–2 meters deep covered with a heavy layer of quicklime.",
+          "Notify local veterinary officers to arrange vaccination for remaining healthy pigs."
+        ]
+      }
+    },
+    {
+      "name": "African Swine Fever",
+      "name_lo": "ພະຍາດອະຫິວາໝູອາຟຣິກາ (ASF)",
+      "name_th": "โรคอหิวาต์แอฟริกาในสุกร (ASF)",
+      "symptoms": [
+        "Peracute / acute form: High fever (40-42°C), loss of appetite, weakness, cyanosis and dark discoloration of skin and ears with hemorrhagic spots, labored breathing, constipation or bloody diarrhea, abortion, blood-tinged froth from mouth and nose",
+        "Subacute form: Intermittent fever, depression, anorexia, swollen leg joints, respiratory distress",
+        "Chronic form: Recurrent fever (~40°C), swollen joints, raised necrotic skin lesions progressing to necrosis",
+        "Inapparent form: Low virulence carrier state"
+      ],
+      "basic_response": {
+        "lo": [
+          "ກັກບໍລິເວນ ແລະ ຫ້າມເຄື່ອນຍ້າຍໝູ, ຊີ້ນໝູ, ຫຼື ອຸປະກອນອອກຈາກຟາມຢ່າງເດັດຂາດ",
+          "ຫ້າມນຳເສດອາຫານທີ່ບໍ່ໄດ້ຕົ້ມສຸກມາເກືອໝູ",
+          "ຂ້າເຊື້ອພາຫະນະ, ເກີບ, ແລະ ອຸປະກອນດ້ວຍຢາຂ້າເຊື້ອ ຫຼື ປູນຂາວທຸກຄັ້ງ",
+          "ໝູທີ່ຕາຍຕ້ອງຝັງເລິກ 2 ແມັດ ພ້ອມໂຮຍປູນຂາວຢ່າງໜາແໜ້ນ ຫຼື ຈູດທຳລາຍ",
+          "ເນື່ອງຈາກຍັງບໍ່ມີຢາປິ່ນປົວ ແລະ ວັກຊີນມາດຕະຖານ, ຕ້ອງເນັ້ນການຕັດວົງຈອນເຊື້ອ ແລະ ລາຍງານດ່ວນ"
+        ],
+        "th": [
+          "กักบริเวณและห้ามเคลื่อนย้ายสุกร เนื้อสุกร หรืออุปกรณ์ออกจากฟาร์มโดยเด็ดขาด",
+          "ห้ามนำเศษอาหารเหลือที่ไม่ได้ต้มสุกมาเลี้ยงสุกร",
+          "ฆ่าเชื้อยานพาหนะ รองเท้าบูท และอุปกรณ์ด้วยน้ำยาฆ่าเชื้อหรือปูนขาวทุกครั้ง",
+          "สุกรที่ตายต้องฝังลึกอย่างน้อย 2 เมตร พร้อมโรยปูนขาวอย่างหนาแน่น หรือเผาทำลาย",
+          "เนื่องจากยังไม่มียารักษาหรือวัคซีน ให้เน้นการตัดวงจรการแพร่เชื้อและรายงานด่วน"
+        ],
+        "en": [
+          "Strictly quarantine the premises and prohibit all movement of live pigs, pork products, and equipment.",
+          "Do not feed pigs untreated swill or kitchen scraps.",
+          "Disinfect footwear, vehicles, and tools thoroughly with disinfectant or quicklime.",
+          "Bury dead pigs at least 2 meters deep covered with thick quicklime, or incinerate.",
+          "As there is no cure or standard field vaccine, focus on strict biosecurity and immediate reporting."
+        ]
+      }
+    },
+    {
+      "name": "Porcine Reproductive and Respiratory Syndrome (PRRS)",
+      "name_lo": "ພະຍາດຫູຟ້າໝູ (PRRS)",
+      "name_th": "โรคเพิร์ส / โรคหูสีน้ำเงินในสุกร (PRRS)",
+      "symptoms": [
+        "Sows: Loss of appetite, fever, depression, sneezing, nasal discharge, blue / red discoloration on ears, abdomen, and genital area; late-term abortions (up to 50%), stillborn or weak piglets",
+        "Boars: High fever, weakness, loss of appetite, reduced semen quality and breeding performance",
+        "Piglets & Growers: Severe respiratory distress (thumping), sneezing, coughing, growth retardation, secondary infections"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກແມ່ພັນທີ່ຫຼຸລູກ ແລະ ໝູທີ່ມີອາການຫາຍໃຈຍາກອອກຕ່າງຫາກ",
+          "ໃຫ້ການປິ່ນປົວຕາມອາການ: ຢາຫຼຸດໄຂ້ ແລະ ຢາຕ້ານເຊື້ອເພື່ອປ້ອງກັນການຕິດເຊື້ອແບັກທີເຣຍແຊກຊ້ອນ",
+          "ໃຫ້ອາຫານທີ່ມີໂພຊະນາການດີ ແລະ ເສີມວິຕາມິນເພື່ອຟື້ນຟູສຸຂະພາບ",
+          "ທຳຄວາມສະອາດ, ຂ້າເຊື້ອ ແລະ ຮັກສາຄອກໃຫ້ແຫ້ງ ແລະ ອາກາດຖ່າຍເທດີ",
+          "ກຳຈັດຊາກລູກໝູທີ່ຫຼຸ ຫຼື ຕາຍດ້ວຍການຝັງເລິກພ້ອມໂຮຍປູນຂາວ"
+        ],
+        "th": [
+          "แยกแม่พันธุ์ที่แท้งและสุกรที่หายใจหอบเหนื่อยออกต่างหาก",
+          "รักษาตามอาการ: ให้ยาลดไข้และยาปฏิชีวนะเพื่อป้องกันการติดเชื้อแบคทีเรียแทรกซ้อน",
+          "ให้อาหารที่มีคุณภาพและเสริมวิตามินเพื่อฟื้นฟูสุขภาพ",
+          "ทำความสะอาด ฆ่าเชื้อ และดูแลโรงเรือนให้แห้ง มีการระบายอากาศที่ดี",
+          "กำจัดซากลูกสุกรที่แท้งหรือตายด้วยการฝังลึกพร้อมโรยปูนขาว"
+        ],
+        "en": [
+          "Isolate aborted sows and pigs exhibiting respiratory distress.",
+          "Provide supportive treatment: antipyretics for fever and antibiotics for secondary bacterial infections.",
+          "Provide high-quality feed and vitamin supplements to support recovery.",
+          "Clean, disinfect, and ensure proper ventilation and dry bedding in pens.",
+          "Dispose of aborted fetuses and dead piglets by deep burial with lime."
+        ]
+      }
+    },
+    {
+      "name": "Leptospirosis",
+      "name_lo": "ພະຍາດເລບໂຕສະໄປໂຣສິສ (ພະຍາດສໍ້ສັດ)",
+      "name_th": "โรคเลปโตสไปโรซิส (โรคฉี่หนูในสุกร)",
+      "symptoms": [
+        "Breeding herd / Sows: Late-term abortions, stillbirths, mummified fetuses, premature birth of weak piglets, repeat breeding (infertility), copious vaginal discharge",
+        "Piglets & Young pigs: Fever, anorexia, jaundice (yellow skin/eyes), anemia/paleness, hematuria (blood in urine), high acute mortality",
+        "Adult pigs: Often asymptomatic chronic renal carriers shedding bacteria in urine"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກໝູປ່ວຍ ແລະ ຮັກສາຄອກໃຫ້ແຫ້ງສະອາດ (ເຊື້ອມັກອາໄສໃນນ້ຳຂັງ ແລະ ດິນປຽກ)",
+          "ປິ່ນປົວໝູປ່ວຍດ້ວຍຢາປະຕິຊີວະນະກຸ່ມ Penicillin, Streptomycin ຫຼື Oxytetracycline ຕາມຄຳແນະນຳ",
+          "ຄວບຄຸມ ແລະ ກຳຈັດໜູໃນຄອກລ້ຽງ ເພາະໜູເປັນພາຫະນະແພ່ເຊື້ອ",
+          "ລະວັງການສຳຜັດນ້ຳຍ່ຽວໝູໂດຍກົງ ເພາະຕິດຕໍ່ສູ່ຄົນໄດ້ (ໃສ່ເກີບໂອ໊ກ ແລະ ຖົງມື)",
+          "ຂ້າເຊື້ອພື້ນຄອກດ້ວຍນ້ຳຢາຂ້າເຊື້ອຢ່າງເປັນປະຈຳ"
+        ],
+        "th": [
+          "แยกสุกรป่วยและดูแลคอกให้แห้งสะอาด (เชื้อชอบอาศัยในน้ำขังและพื้นเปียกชื้น)",
+          "รักษาด้วยยาปฏิชีวนะกลุ่ม Penicillin, Streptomycin หรือ Oxytetracycline ตามคำแนะนำ",
+          "ควบคุมและกำจัดหนูในบริเวณฟาร์มเพราะหนูเป็นพาหะนำโรคหลัก",
+          "ระวังการสัมผัสปัสสาวะสุกรโดยตรงเนื่องจากติดต่อสู่คนได้ (สวมบูทและถุงมือ)",
+          "ฆ่าเชื้อพื้นคอกด้วยน้ำยาฆ่าเชื้อเป็นประจำ"
+        ],
+        "en": [
+          "Isolate sick pigs and keep housing dry and well-drained (the bacteria thrives in standing water and damp soil).",
+          "Treat affected pigs with antibiotics such as Penicillin, Streptomycin, or long-acting Oxytetracycline.",
+          "Implement rodent control, as rodents are primary carriers of leptospires.",
+          "Avoid direct contact with pig urine (wear rubber boots and gloves) as it is zoonotic.",
+          "Regularly disinfect pen floors and drainage."
+        ]
+      }
+    },
+    {
+      "name": "Rabies",
+      "name_lo": "ພະຍາດວໍ້ໃນໝູ",
+      "name_th": "โรคพิษสุนัขบ้าในสุกร",
+      "symptoms": [
+        "Early behavioral signs: Sudden abnormal behavior, extreme restlessness, hyperexcitation, aggressive biting",
+        "Neurological & muscular signs: Facial muscle twitching, rapid 'phantom' chewing, profuse salivation/drooling, abnormal vocalization (violent grunting/roaring)",
+        "Paralytic & terminal signs: Posterior paralysis, 'dog-sitting' posture, ataxia, convulsions, lateral recumbency, coma, death in 3-4 days"
+      ],
+      "basic_response": {
+        "lo": [
+          "ຂັງໝູທີ່ສົງໄສໄວ້ໃນຄອກທີ່ແຂງແຮງ, ຫ້າມເຂົ້າໃກ້ ຫຼື ສຳຜັດໂດຍກົງ",
+          "ຫ້າມຂ້າໝູມາກິນ ຫຼື ຂາຍຢ່າງເດັດຂາດ",
+          "ຖ້າໝູຕາຍ ຕ້ອງຝັງເລິກຢ່າງໜ້ອຍ 2 ແມັດ ພ້ອມໂຮຍປູນຂາວ (ຫ້າມປາດຊາກ)",
+          "ກວດກາໝາ ແລະ ແມວໃນບໍລິເວນນັ້ນ, ຖ້າຄົນຖືກກັດໃຫ້ຟ້າວລ້າງບາດແຜດ້ວຍສະບູ ແລະ ໄປສັກຢາວັກຊີນວໍ້ທັນທີ",
+          "ແຈ້ງເຈົ້າໜ້າທີ່ສັດຕະວະແພດ ແລະ ສາທາລະນະສຸກທັນທີ"
+        ],
+        "th": [
+          "กักขังสุกรต้องสงสัยในคอกที่แข็งแรง ห้ามเข้าใกล้หรือสัมผัสตัวสุกรโดยตรง",
+          "ห้ามชำแหละเนื้อสุกรเพื่อบริโภคหรือจำหน่ายโดยเด็ดขาด",
+          "หากสุกรตาย ให้ฝังลึกอย่างน้อย 2 เมตร พร้อมโรยปูนขาว (ห้ามผ่าซาก)",
+          "ตรวจสอบสุนัขและแมวในบริเวณ หากคนถูกกัด/ข่วน ให้รีบล้างแผลด้วยสบู่และไปพบแพทย์เพื่อฉีดวัคซีนพิษสุนัขบ้าทันที",
+          "แจ้งเจ้าหน้าที่ปศุสัตว์และสาธารณสุขในพื้นที่ทันที"
+        ],
+        "en": [
+          "Confine the suspected pig in a secure pen; do not approach or handle it directly.",
+          "Never slaughter, sell, or consume meat from a rabid animal.",
+          "Bury dead pigs at least 2 meters deep with lime (do not open or perform necropsy on the carcass).",
+          "Check dogs and cats in the vicinity; if any human is bitten/exposed, wash wounds with soap and seek immediate post-exposure vaccination.",
+          "Notify veterinary and public health authorities immediately."
+        ]
+      }
+    },
+    {
+      "name": "Trichinellosis",
+      "name_lo": "ພະຍາດແມ່ທ້ອງທຣິກຄິເນລລາ",
+      "name_th": "โรคพยาธิทริคิเนลลาในสุกร",
+      "symptoms": [
+        "Intestinal stage: Gastrointestinal signs including abdominal pain, diarrhea, vomiting, fever",
+        "Muscle invasion stage: Larval migration into skeletal muscles causing muscle pain, inflammation, stiffness, facial and periorbital edema",
+        "Convalescent / Encystment phase: Subsiding swelling, potential complications (meningitis, myocarditis, pleuritis)"
+      ],
+      "basic_response": {
+        "lo": [
+          "ຫ້າມປ່ອຍໝູລ້ຽງແບບຊະຊາຍ ແລະ ຫ້າມໃຫ້ໝູກິນຊາກສັດ ຫຼື ເສດຊີ້ນດິບ",
+          "ປິ່ນປົວດ້ວຍຢາຂັບແມ່ທ້ອງ (ເຊັ່ນ Albendazole ຫຼື Fenbendazole) ພາຍໃຕ້ການແນະນຳຂອງສັດຕະວະແພດ",
+          "ແນະນຳຊາວບ້ານໃຫ້ປຸງແຕ່ງຊີ້ນໝູໃຫ້ສຸກດີ 100% ກ່ອນບໍລິໂພກ (ຫ້າມກິນລາບດິບ/ຊີ້ນດິບ)",
+          "ຮັກສາຄວາມສະອາດຄອກໝູ ແລະ ກຳຈັດໜູເຊິ່ງເປັນພາຫະນະນຳເຊື້ອ"
+        ],
+        "th": [
+          "ห้ามปล่อยสุกรหากินตามธรรมชาติ และห้ามให้สุกรกินซากสัตว์หรือเศษเนื้อดิบ",
+          "ให้ยาถ่ายพยาธิ (เช่น Albendazole หรือ Fenbendazole) ตามคำแนะนำของสัตวแพทย์",
+          "แนะนำชาวบ้านให้ปรุงเนื้อหมูให้สุก 100% ก่อนรับประทาน (ห้ามกินลาบดิบ/เนื้อหมูดิบ)",
+          "รักษาความสะอาดคอกสุกรและกำจัดหนูในฟาร์ม"
+        ],
+        "en": [
+          "Confine pigs in pens and prevent them from scavenging carcasses or raw meat scraps.",
+          "Administer anthelmintic dewormers (e.g., Albendazole or Fenbendazole) under veterinary guidance.",
+          "Advise the community to cook pork thoroughly (100% cooked) before consumption (avoid raw pork dishes).",
+          "Maintain farm hygiene and control rodent populations."
+        ]
+      }
+    },
+    {
+      "name": "Foot and Mouth Disease (FMD)",
+      "name_lo": "ພະຍາດປາກ ແລະ ຕີນເປື່ອຍ (FMD)",
+      "name_th": "โรคปากและเท้าเปื่อยในสุกร (FMD)",
+      "symptoms": [
+        "High fever (40.0-41.5°C), depression, lethargy, anorexia, reluctance to move",
+        "Excessive frothy salivation and drooling, lip smacking",
+        "Oral lesions: Darkened mucous membranes developing vesicles and fluid-filled blisters on tongue, snout, gums that rupture into painful ulcers and necrotic wounds",
+        "Foot lesions: Blisters along coronary band and interdigital space, severe lameness, hoof detachment / sloughing in severe cases"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກໝູປ່ວຍອອກທັນທີ ແລະ ຫ້າມເຄື່ອນຍ້າຍສັດເຂົ້າ-ອອກຟາມ",
+          "ລ້າງບາດແຜຢູ່ປາກ ແລະ ເກີບກີບຕີນດ້ວຍນ້ຳເກືອສະອາດ ຫຼື ດ່າງທັບທິມເຈືອຈາງ, ແລ້ວທາຢາສີມ່ວງ (Gentian violet)",
+          "ໃຫ້ອາຫານອ່ອນ, ນ້ຳສະອາດປະສົມວິຕາມິນ ແລະ ຢາຕ້ານເຊື້ອຊະນິດສີດເພື່ອປ້ອງກັນການຕິດເຊື້ອແບັກທີເຣຍແຊກຊ້ອນ",
+          "ໂຮຍປູນຂາວ ຫຼື ສີດພົ່ນຢາຂ້າເຊື້ອອ້ອມຄອກ ແລະ ທາງຍ່າງທຸກມື້",
+          "ຮັກສາພື້ນຄອກໃຫ້ແຫ້ງ ແລະ ສະອາດເພື່ອໃຫ້ບາດແຜຕີນເຊົາໄວ"
+        ],
+        "th": [
+          "แยกสุกรป่วยออกทันที และห้ามเคลื่อนย้ายสุกรเข้า-ออกจากฟาร์ม",
+          "ล้างแผลที่ปากและกีบเท้าด้วยน้ำเกลือสะอาดหรือด่างทับทิมเจือจาง แล้วทายาม่วง (Gentian violet)",
+          "ให้อาหารอ่อน น้ำสะอาดผสมวิตามิน และฉีดยาปฏิชีวนะเพื่อป้องกันการติดเชื้อแบคทีเรียแทรกซ้อน",
+          "โรยปูนขาวหรือพ่นยาฆ่าเชื้อรอบคอกและทางเดินทุกวัน",
+          "ดูแลพื้นคอกให้แห้งและสะอาดเพื่อช่วยให้แผลที่เท้าหายเร็วขึ้น"
+        ],
+        "en": [
+          "Isolate sick pigs immediately and ban movement of animals and animal products.",
+          "Clean oral and hoof lesions with clean saline or mild antiseptic, then apply gentian violet.",
+          "Provide soft feed, clean water with vitamins, and injectable antibiotics for secondary infections.",
+          "Apply quicklime or spray disinfectant on pen floors and walkways daily.",
+          "Keep pen floors clean and dry to accelerate hoof healing."
+        ]
+      }
+    }
+  ],
+  "Cattle and Buffalo": [
+    {
+      "name": "Foot and Mouth Disease (FMD)",
+      "name_lo": "ພະຍາດປາກ ແລະ ຕີນເປື່ອຍ (FMD)",
+      "name_th": "โรคปากและเท้าเปื่อยในโค-กระบือ (FMD)",
+      "symptoms": [
+        "High fever (40.0-41.5°C), depression, dry muzzle, anorexia, rapid weight loss",
+        "Excessive stringy salivation and drooling",
+        "Vesicles on tongue, dental pad, gums, and oral mucosa rupturing into erosions, ulcers, and necrotic tissue",
+        "Severe lameness, reluctance to walk, vesicles and erosions on interdigital cleft and coronary bands, hoof sloughing in severe cases"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກງົວ-ຄວາຍປ່ວຍອອກຈາກຝູງ ແລະ ກັກໄວ້ໃນຄອກທີ່ມີຮົ່ມ ແລະ ພື້ນແຫ້ງ",
+          "ລ້າງບາດແຜໃນປາກດ້ວຍນ້ຳເກືອອຸ່ນ ຫຼື ດ່າງທັບທິມເຈືອຈາງ, ທາຢາສີມ່ວງ (Gentian violet)",
+          "ລ້າງບາດແຜທີ່ກີບຕີນໃຫ້ສະອາດ, ສີດຢາຂ້າເຊື້ອ/ທາຢາຮັກສາບາດແຜ ແລະ ໃສ່ຢາໄລ່ແມງວັນ",
+          "ຕັດຫຍ້າອ່ອນ, ອາຫານອ່ອນ ແລະ ໃຫ້ນ້ຳສະອາດຢ່າງພຽງພໍ",
+          "ສີດຢາຫຼຸດໄຂ້/ຫຼຸດອັກເສບ ແລະ ຢາຕ້ານເຊື້ອເພື່ອປ້ອງກັນການຕິດເຊື້ອແຊກຊ້ອນ",
+          "ໂຮຍປູນຂາວອ້ອມຄອກ ແລະ ຫ້າມຕ້ອນງົວ-ຄວາຍໄປລ້ຽງປົນກັບຝູງອື່ນ"
+        ],
+        "th": [
+          "แยกโค-กระบือที่ป่วยออกจากฝูง และกักไว้ในคอกที่มีร่มเงาและพื้นแห้ง",
+          "ล้างแผลในปากด้วยน้ำเกลืออุ่นหรือด่างทับทิมเจือจาง แล้วทายาม่วง (Gentian violet)",
+          "ล้างแผลที่กีบเท้าให้สะอาด พ่นยาฆ่าเชื้อ/ทายารักษาแผล และพ่นยาไล่แมลงวัน",
+          "ตัดหญ้าอ่อน อาหารอ่อน และให้น้ำสะอาดอย่างเพียงพอ",
+          "ฉีดยาลดไข้/ลดอักเสบ และยาปฏิชีวนะเพื่อป้องกันการติดเชื้อแทรกซ้อน",
+          "โรยปูนขาวรอบคอก และห้ามต้อนสัตว์ไปเลี้ยงปะปนกับฝูงอื่น"
+        ],
+        "en": [
+          "Isolate sick cattle/buffalo in a shaded, dry, and clean enclosure.",
+          "Clean oral blisters/sores with warm saline or diluted potassium permanganate, then apply gentian violet.",
+          "Clean foot lesions, apply antiseptic wound spray, and apply fly repellent.",
+          "Provide soft, green chop forage and abundant clean water.",
+          "Administer anti-inflammatory/antipyretic injections and antibiotics to prevent secondary infections.",
+          "Spread quicklime around enclosures and prohibit communal grazing."
+        ]
+      }
+    },
+    {
+      "name": "Haemorrhagic Septicemia",
+      "name_lo": "ພະຍາດເຕົ້າໂຮມເລືອດງົວຄວາຍ (ພະຍາດຄໍບວມ)",
+      "name_th": "โรคเฮโมรายิกเซปติกซีเมีย / โรคคอบวม",
+      "symptoms": [
+        "Peracute form: Sudden death within 10-24 hours, severe dyspnea, blood-stained nasal discharge, severe diarrhea",
+        "Acute form: High fever (41-42°C), prominent edematous swelling of the throat and submandibular area (submandibular edema), loud abnormal respiratory sounds, open-mouth breathing, frothy salivation, stiff gait",
+        "Chronic form: Emaciation, debility, death after 1-4 months"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປ່ວຍອອກທັນທີ ແລະ ຮີບຮ້ອນປິ່ນປົວແຕ່ຫົວທີ",
+          "ສີດຢາປະຕິຊີວະນະໂດຍດ່ວນ (ເຊັ່ນ Oxytetracycline LA, Penicillin-Streptomycin ຫຼື Sulfa) ຕາມຂະໜາດນ້ຳໜັກສັດ",
+          "ສີດຢາຫຼຸດໄຂ້ ແລະ ຢາຂະຫຍາຍຫຼອດລົມເພື່ອຊ່ວຍການຫາຍໃຈ",
+          "ສັດທີ່ຕາຍຕ້ອງຝັງເລິກ 1.5–2 ແມັດ ພ້ອມໂຮຍປູນຂາວ, ຫ້າມປາດຊີ້ນກິນ",
+          "ວາງແຜນສີດວັກຊີນປ້ອງກັນພະຍາດເຕົ້າໂຮມເລືອດໃຫ້ສັດທີ່ຍັງແຂງແຮງໃນບ້ານ"
+        ],
+        "th": [
+          "แยกสัตว์ป่วยออกทันที และรีบทำการรักษาตั้งแต่เริ่มแสดงอาการแรกเริ่ม",
+          "ฉีดยาปฏิชีวนะโดยด่วน เช่น Oxytetracycline LA, Penicillin-Streptomycin หรือ Sulfa ตามขนาดยาต่อน้ำหนักสัตว์",
+          "ฉีดยาลดไข้และยาขยายหลอดลมเพื่อช่วยการหายใจ",
+          "สัตว์ที่ตายต้องฝังลึก 1.5–2 เมตร พร้อมโรยปูนขาว ห้ามชำแหละเนื้อบริโภค",
+          "วางแผนฉีดวัคซีนป้องกันโรคเฮโมรายิกเซปติกซีเมีย (โรคคอบวม) ให้สัตว์ที่ยังแข็งแรงในหมู่บ้าน"
+        ],
+        "en": [
+          "Isolate affected animals immediately and start treatment as early as possible.",
+          "Promptly administer injectable antibiotics (e.g., long-acting Oxytetracycline, Penicillin-Streptomycin, or Sulfa) per body weight.",
+          "Administer antipyretics and bronchodilators to ease breathing.",
+          "Bury carcasses 1.5–2 meters deep with lime; do not slaughter or eat meat.",
+          "Vaccinate healthy cattle and buffalo in the village against Haemorrhagic Septicemia."
+        ]
+      }
+    },
+    {
+      "name": "Anthrax",
+      "name_lo": "ພະຍາດເລືອດດຳ (ໄຂ້ເລືອດສາດ / ແອນແທຣກ)",
+      "name_th": "โรคแอนแทรกซ์ (โรคกาลี / ไข้เลือดดำ)",
+      "symptoms": [
+        "Peracute form: Sudden death within 1-24 hours, dyspnea, ataxia, muscle tremors, convulsions, bellowing, dark unclotted blood from natural orifices",
+        "Acute form: High fever (40-42°C), depression, body tremors, congested / cyanotic mucous membranes, bloody diarrhea, abortion",
+        "Chronic form: Subcutaneous edema of jaw, neck, shoulders, and ventral abdomen, progressive emaciation"
+      ],
+      "basic_response": {
+        "lo": [
+          "**ຫ້າມປາດຊາກສັດຢ່າງເດັດຂາດ** ເພາະເຊື້ອຈະສ້າງສະປໍຕົກຄ້າງໃນດິນໄດ້ຫຼາຍສິບປີ ແລະ ຕິດຕໍ່ສູ່ຄົນເຖິງຊີວິດ",
+          "ຝັງຊາກສັດທັງໝົດໃຫ້ເລິກຢ່າງໜ້ອຍ 2 ແມັດ ພ້ອມໂຮຍປູນຂາວຢ່າງໜາແໜ້ນທັງກົ້ນຂຸມ ແລະ ເທິງຊາກ",
+          "ສຳລັບສັດທີ່ເລີ່ມສະແດງອາການ: ສີດຢາ Penicillin ຂະໜາດສູງທັນທີ",
+          "ຜູ້ປະຕິບັດງານຕ້ອງໃສ່ຖົງມື, ຜ້າອັດດັງ, ເກີບໂອ໊ກ ແລະ ລ້າງມືດ້ວຍຢາຂ້າເຊື້ອ",
+          "ແຈ້ງສັດຕະວະແພດ ແລະ ສາທາລະນະສຸກຂັ້ນເມືອງ/ແຂວງໂດຍດ່ວນທີ່ສຸດ"
+        ],
+        "th": [
+          "**ห้ามผ่าหรือชำแหละซากสัตว์โดยเด็ดขาด** เพราะเชื้อจะสร้างสปอร์ตกค้างในดินได้นานหลายสิบปี และติดต่อสู่คนจนถึงแก่ชีวิต",
+          "ฝังซากสัตว์ทั้งตัวลึกอย่างน้อย 2 เมตร พร้อมโรยปูนขาวอย่างหนาแน่นทั้งก้นหลุมและบนซาก",
+          "สำหรับสัตว์ที่เพิ่งเริ่มแสดงอาการ: รีบฉีดยาเพนิซิลลิน (Penicillin) ขนาดสูงทันที",
+          "ผู้ปฏิบัติงานต้องสวมถุงมือ หน้ากาก บูท และล้างมือด้วยน้ำยาฆ่าเชื้อทันที",
+          "แจ้งเจ้าหน้าที่ปศุสัตว์และสาธารณสุขในพื้นที่โดยด่วนที่สุด"
+        ],
+        "en": [
+          "**STRICTLY DO NOT OPEN OR PERFORM NECROPSY ON CARCASSES**, as exposure to air causes lethal spores that persist in soil for decades and can kill humans.",
+          "Bury the intact carcass at least 2 meters deep covered with heavy quicklime at the pit bottom and on top.",
+          "For animals in early stages of illness: administer high-dose Penicillin immediately.",
+          "Handlers must wear PPE (gloves, masks, rubber boots) and disinfect thoroughly.",
+          "Notify district/provincial veterinary and public health authorities immediately."
+        ]
+      }
+    },
+    {
+      "name": "Black Leg",
+      "name_lo": "ພະຍາດຂາລີບ (ຂາດຳ)",
+      "name_th": "โรคแบล็กเลก (โรคขาลีบ / ไข้ขาดำ)",
+      "symptoms": [
+        "Acute onset, incubation period 1-5 days",
+        "Hot, painful, crepitant / spongy edematous swelling in heavy musculature (lumbar, thigh, hip, shoulder)",
+        "Severe lameness, unable to stand, reluctance to move, death within 1-2 days"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປ່ວຍອອກ, ຖ້າພົບໃນໄລຍະເລີ່ມຕົ້ນໃຫ້ສີດຢາ Penicillin ຂະໜາດສູງຮ່ວມກັບຢາຫຼຸດອັກເສບ",
+          "ຫ້າມປາດກ້າມຊີ້ນສ່ວນທີ່ບວມມາກິນ ເພາະມີເຊື້ອແລະສານພິດ",
+          "ຝັງຊາກສັດຕາຍໃຫ້ເລິກພ້ອມໂຮຍປູນຂາວ",
+          "ຂ້າເຊື້ອຄອກ ແລະ ດິນບໍລິເວນທີ່ສັດປ່ວຍເຄີຍຢູ່",
+          "ສີດວັກຊີນປ້ອງກັນພະຍາດຂາດຳໃຫ້ສັດລຸ້ນໜຸ່ມ (ອາຍຸ 6 ເດືອນ - 2 ປີ) ທັງໝົດ"
+        ],
+        "th": [
+          "แยกสัตว์ป่วย หากพบในระยะเริ่มแรกให้ฉีดยาเพนิซิลลินขนาดสูงร่วมกับยาลดการอักเสบ",
+          "ห้ามชำแหละกล้ามเนื้อส่วนที่บวมมารับประทาน เนื่องจากมีเชื้อและสารพิษรุนแรง",
+          "ฝังซากสัตว์ตายให้ลึกพร้อมโรยปูนขาว",
+          "ฆ่าเชื้อคอกและดินบริเวณที่สัตว์ป่วยเคยอยู่",
+          "ฉีดวัคซีนป้องกันโรคแบล็กเลก (โรคขาลีบ) ให้สัตว์รุ่นหนุ่มสาว (อายุ 6 เดือน - 2 ปี) ทั้งหมด"
+        ],
+        "en": [
+          "Isolate sick animals; if detected early, administer high-dose Penicillin and anti-inflammatory drugs.",
+          "Do not butcher or consume swollen muscle tissues, as they contain dangerous toxins and bacteria.",
+          "Bury carcasses deeply with quicklime.",
+          "Disinfect pens and soil areas where sick animals were kept.",
+          "Vaccinate all young stock (6 months to 2 years) against Blackleg."
+        ]
+      }
+    },
+    {
+      "name": "Lumpy Skin Disease",
+      "name_lo": "ພະຍາດຜິວໜັງອັກເສບຕຸ່ມນູນ (LSD)",
+      "name_th": "โรคลัมปี สกิน (LSD)",
+      "symptoms": [
+        "Fever (40-41.5°C), depression, anorexia, lacrimation, nasal discharge",
+        "Eruption of firm, round, circumscribed skin nodules (5-50 mm) over body (neck, head, udder, perineum)",
+        "Ulceration of nodules exuding fluid, forming necrotic sitfasts / scabs persisting 1-2 months",
+        "Edema of limbs, brisket, and genitals, reduced milk production, reduced semen quality in bulls"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກງົວ-ຄວາຍທີ່ມີຕຸ່ມອອກຈາກຝູງ ແລະ ກາງມຸ້ງ ຫຼື ສີດຢາຂ້າແມງດູດເລືອດ (ຍຸງ, ເຫຼືອກ, ແມງວັນ)",
+          "ປິ່ນປົວບາດແຜຕຸ່ມຕາມຜິວໜັງ: ສີດພົ່ນຢາຂ້າເຊື້ອ/ທາຢາສີມ່ວງ ແລະ ຢາໄລ່ແມງວັນເພື່ອປ້ອງກັນແມງວັນໄຂ່ໃສ່",
+          "ສີດຢາຫຼຸດໄຂ້/ຫຼຸດອັກເສບ ແລະ ຢາຕ້ານເຊື້ອ (Antibiotic) ເພື່ອປ້ອງກັນການຕິດເຊື້ອແບັກທີເຣຍແຊກຊ້ອນ",
+          "ໃຫ້ນ້ຳສະອາດ, ຫຍ້າອ່ອນ ແລະ ວິຕາມິນບຳລຸງຮ່າງກາຍ",
+          "ໂຮຍປູນຂາວຂ້າເຊື້ອຮອບຄອກ ແລະ ງົດການເຄື່ອນຍ້າຍສັດ"
+        ],
+        "th": [
+          "แยกโค-กระบือที่มีตุ่มออกจากฝูง และกางมุ้งหรือพ่นยากำจัดแมลงดูดเลือด (ยุง ริ้น เหลือบ แมลงวัน)",
+          "รักษาแผลตุ่มตามผิวหนัง: พ่นยาฆ่าเชื้อ/ทายาม่วง และพ่นยาไล่แมลงเพื่อป้องกันหนอนแมลงวัน",
+          "ฉีดยาลดไข้/ลดการอักเสบ และยาปฏิชีวนะเพื่อป้องกันการติดเชื้อแบคทีเรียแทรกซ้อน",
+          "ให้น้ำสะอาด หญ้าอ่อน และวิตามินบำรุง",
+          "โรยปูนขาวฆ่าเชื้อรอบคอก และงดการเคลื่อนย้ายสัตว์"
+        ],
+        "en": [
+          "Isolate animals with skin nodules and use netting or insect repellent against biting vectors (flies, mosquitoes, ticks).",
+          "Treat skin lesions: apply antiseptic spray/gentian violet and fly repellent to prevent myiasis (maggots).",
+          "Administer antipyretics/NSAIDs and broad-spectrum antibiotics to control fever and secondary infections.",
+          "Provide soft forage, clean water, and multivitamin boosters.",
+          "Apply quicklime around pens and restrict animal movements."
+        ]
+      }
+    },
+    {
+      "name": "Leptospirosis",
+      "name_lo": "ພະຍາດເລບໂຕສະໄປໂຣສິສ (ພະຍາດສໍ້ສັດ)",
+      "name_th": "โรคเลปโตสไปโรซิสในโค-กระบือ",
+      "symptoms": [
+        "Acute form: Abortion storms during pregnancy, stillbirths, weak calves, jaundice, fever, hemoglobinuria, blood-tinged milk ('flaccid agalactia')",
+        "Chronic form: Silent reproductive failure, early embryonic death, repeat breeding, persistent genital tract colonization"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປ່ວຍ ຫຼື ສັດທີ່ຫຼຸລູກອອກຕ່າງຫາກ",
+          "ປິ່ນປົວດ້ວຍຢາຕ້ານເຊື້ອ Oxytetracycline LA ຫຼື Streptomycin ຕາມຄຳແນະນຳ",
+          "ອະນາໄມຄອກ, ລະບາຍນ້ຳຂັງ ແລະ ໂຮຍປູນຂາວ",
+          "ຄວບຄຸມຈຳນວນໜູ ແລະ ປ້ອງກັນບໍ່ໃຫ້ແຫຼ່ງນ້ຳດື່ມປົນເປື້ອນນ້ຳຍ່ຽວ",
+          "ໃສ່ຖົງມື ແລະ ເກີບໂອ໊ກເວລາລ້າງຄອກ ຫຼື ສຳຜັດນ້ຳຄາວປາ ເພາະຕິດຕໍ່ສູ່ຄົນໄດ້"
+        ],
+        "th": [
+          "แยกสัตว์ป่วยหรือแม่โคที่แท้งลูกออกต่างหาก",
+          "รักษาด้วยยาปฏิชีวนะ Oxytetracycline LA หรือ Streptomycin ตามคำแนะนำ",
+          "ทำความสะอาดคอก ระบายน้ำขัง และโรยปูนขาว",
+          "ควบคุมหนูในฟาร์มและป้องกันแหล่งน้ำดื่มไม่ให้ปนเปื้อนปัสสาวะสัตว์",
+          "สวมถุงมือและรองเท้าบูทเมื่อทำความสะอาดคอกหรือช่วยทำคลอดเพราะติดต่อสู่คนได้"
+        ],
+        "en": [
+          "Isolate sick cows or those that have suffered abortions.",
+          "Treat with antibiotics such as long-acting Oxytetracycline or Streptomycin.",
+          "Sanitize housing, eliminate standing water, and spread lime.",
+          "Control rodent populations and protect water supplies from urine contamination.",
+          "Wear protective gloves and boots when handling fluids or cleaning as leptospirosis is zoonotic."
+        ]
+      }
+    },
+    {
+      "name": "Rabies",
+      "name_lo": "ພະຍາດວໍ້ງົວຄວາຍ",
+      "name_th": "โรคพิษสุนัขบ้าในโค-กระบือ",
+      "symptoms": [
+        "Abnormal behavior, hyperexcitability, restlessness, unprovoked aggression or depression/stupor",
+        "Neurological signs: Ataxia, hindlimb weakness, tremors, inability to swallow, apparent choking",
+        "Distinct loud vocalization (continuous bellowing)",
+        "Hypersalivation / drooling, tenesmus, ascending paralysis progressing to death within days"
+      ],
+      "basic_response": {
+        "lo": [
+          "ກັກຂັງສັດທີ່ສົງໄສໄວ້ໃນຄອກດ່ຽວທີ່ແຂງແຮງ, ຫ້າມຍື່ນມືເຂົ້າໄປໃນປາກສັດເດັດຂາດ (ສັດມັກສະແດງອາການຄ້າຍຄືກະດູກຕິດຄໍ)",
+          "ຫ້າມຂ້າສັດມາກິນ ຫຼື ຂາຍຊີ້ນຢ່າງເດັດຂາດ",
+          "ຖ້າສັດຕາຍ ໃຫ້ຝັງເລິກ 2 ແມັດ ພ້ອມໂຮຍປູນຂາວ (ຫ້າມປາດຫົວ ຫຼື ຜ່າຊາກ)",
+          "ຖ້າຄົນຖືກນ້ຳລາຍ ຫຼື ຖືກກັດ ໃຫ້ຮີບລ້າງສະບູຫຼາຍໆນ້ຳ ແລະ ໄປໂຮງໝໍສັກຢາວັກຊີນທັນທີ",
+          "ແຈ້ງສັດຕະວະແພດ ແລະ ສາທາລະນະສຸກດ່ວນ"
+        ],
+        "th": [
+          "กักขังสัตว์ต้องสงสัยในคอกเดี่ยวที่แข็งแรง ห้ามล้วงมือเข้าไปในปากสัตว์โดยเด็ดขาด (สัตว์มักมีอาการคล้ายกระดูกติดคอ)",
+          "ห้ามชำแหละเนื้อสัตว์เพื่อบริโภคหรือจำหน่ายโดยเด็ดขาด",
+          "หากสัตว์ตาย ให้ฝังลึก 2 เมตร พร้อมโรยปูนขาว (ห้ามผ่าซากหรือตัดหัว)",
+          "หากคนสัมผัสน้ำลายหรือถูกกัด ให้รีบล้างน้ำสบู่ปริมาณมากและไปโรงพยาบาลเพื่อฉีดวัคซีนทันที",
+          "แจ้งเจ้าหน้าที่ปศุสัตว์และสาธารณสุขโดยด่วน"
+        ],
+        "en": [
+          "Confine suspect cattle in a strong single pen; NEVER reach into the animal's mouth (rabid cattle frequently mimic choking symptoms).",
+          "Do not slaughter, sell, or consume meat from suspected rabid animals.",
+          "Bury carcasses 2 meters deep with lime (do not open carcass or cut head).",
+          "If humans are exposed to saliva, wash thoroughly with soap and water for 15 minutes and seek post-exposure prophylaxis immediately.",
+          "Notify veterinary and public health officers promptly."
+        ]
+      }
+    }
+  ],
+  "Sheep and Goat": [
+    {
+      "name": "Rabies",
+      "name_lo": "ພະຍາດວໍ້ແບ້ແກະ",
+      "name_th": "โรคพิษสุนัขบ้าในแพะ-แกะ",
+      "symptoms": [
+        "Goats: Furious form common, hyperexcitation, aggression, excessive bleating, circling, weakness, difficulty swallowing, profuse drooling",
+        "Sheep: Dysphagia, hypersalivation, tremors, paralysis, recumbency, aggression, wool pulling, excessive bleating"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກຂັງສັດທີ່ສະແດງອາການດຸຮ້າຍ, ຮ້ອງຜິດປົກກະຕິ ຫຼື ນ້ຳລາຍໄຫຼໄວ້ຕ່າງຫາກ",
+          "ຫ້າມສຳຜັດນ້ຳລາຍສັດໂດຍກົງ ແລະ ຫ້າມປາດຊາກບໍລິໂພກ",
+          "ຝັງຊາກສັດຕາຍເລິກ 2 ແມັດ ພ້ອມໂຮຍປູນຂາວ",
+          "ກວດກາໝາ-ແມວໃນຟາມ ແລະ ແຈ້ງເຈົ້າໜ້າທີ່ສັດຕະວະແພດທັນທີ"
+        ],
+        "th": [
+          "แยกขังสัตว์ที่แสดงอาการดุร้าย ร้องผิดปกติ หรือมีน้ำลายไหลไว้ต่างหาก",
+          "ห้ามสัมผัสน้ำลายสัตว์โดยตรง และห้ามชำแหละซากบริโภค",
+          "ฝังซากสัตว์ตายลึก 2 เมตร พร้อมโรยปูนขาว",
+          "ตรวจสอบสุนัขและแมวในฟาร์ม และแจ้งเจ้าหน้าที่ปศุสัตว์ทันที"
+        ],
+        "en": [
+          "Quarantine animals showing aggression, abnormal bleating, or drooling.",
+          "Avoid direct contact with saliva; never butcher rabid carcasses.",
+          "Bury dead sheep/goats 2 meters deep with quicklime.",
+          "Check farm dogs/cats and report immediately to veterinary authorities."
+        ]
+      }
+    },
+    {
+      "name": "Leptospirosis",
+      "name_lo": "ພະຍາດເລບໂຕສະໄປໂຣສິສ",
+      "name_th": "โรคเลปโตสไปโรซิสในแพะ-แกะ",
+      "symptoms": [
+        "High fever, abortion, stillbirth, agalactia, perinatal death",
+        "Lambs and kids: Poor body condition, fever, hemoglobinuria (dark red urine), jaundice, acute mortality"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກສັດປ່ວຍ ແລະ ແມ່ພັນທີ່ຫຼຸລູກ",
+          "ປິ່ນປົວດ້ວຍຢາປະຕິຊີວະນະ Oxytetracycline ຫຼື Penicillin",
+          "ຮັກສາຄອກໃຫ້ແຫ້ງສະອາດ, ປ້ອງກັນບໍ່ໃຫ້ແຫຼ່ງນ້ຳປົນເປື້ອນນ້ຳຍ່ຽວ",
+          "ໃສ່ຖົງມືທຸກຄັ້ງເມື່ອຊ່ວຍອອກລູກ ຫຼື ສຳຜັດນ້ຳຍ່ຽວ"
+        ],
+        "th": [
+          "แยกสัตว์ป่วยและแม่พันธุ์ที่แท้งลูก",
+          "รักษาด้วยยาปฏิชีวนะ Oxytetracycline หรือ Penicillin",
+          "ดูแลคอกให้แห้งสะอาด และป้องกันไม่ให้แหล่งน้ำปนเปื้อนปัสสาวะ",
+          "สวมถุงมือทุกครั้งเมื่อช่วยคลอดหรือสัมผัสน้ำคาวปลา/ปัสสาวะ"
+        ],
+        "en": [
+          "Isolate sick animals and aborted ewes/does.",
+          "Treat with antibiotics like Oxytetracycline or Penicillin.",
+          "Keep pens clean and dry; prevent urine contamination of water troughs.",
+          "Wear gloves when assisting birth or cleaning contaminated bedding."
+        ]
+      }
+    },
+    {
+      "name": "Foot and Mouth Disease (FMD)",
+      "name_lo": "ພະຍາດປາກ ແລະ ຕີນເປື່ອຍ (FMD)",
+      "name_th": "โรคปากและเท้าเปื่อยในแพะ-แกะ (FMD)",
+      "symptoms": [
+        "Lameness (primary clinical feature), reluctance to stand, increased recumbency in young lambs",
+        "High fever, severe depression, reduced milk yield in dairy sheep/goats, ewes refusing to allow lambs to suckle",
+        "Elevated rates of abortion, stillbirth, neonatal lamb death",
+        "Small blisters and erosions on feet (coronary band and interdigital space) and dental pad/oral mucosa"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກແບ້-ແກະທີ່ຂາເປເຈັບຕີນອອກມາໄວ້ໃນຄອກແຫ້ງ ແລະ ມີຮົ່ມ",
+          "ລ້າງບາດແຜທີ່ກີບຕີນ ແລະ ປາກດ້ວຍນ້ຳເກືອສະອາດ ຫຼື ດ່າງທັບທິມ, ທາຢາສີມ່ວງ (Gentian violet)",
+          "ຊ່ວຍປ້ອນນ້ຳ, ຫຍ້າອ່ອນ ແລະ ວິຕາມິນ",
+          "ສີດຢາປະຕິຊີວະນະເພື່ອປ້ອງກັນການຕິດເຊື້ອແບັກທີເຣຍແຊກຊ້ອນທີ່ກີບຕີນ",
+          "ໂຮຍປູນຂາວຂ້າເຊື້ອອ້ອມຄອກ ແລະ ຫ້າມເຄື່ອນຍ້າຍສັດ"
+        ],
+        "th": [
+          "แยกแพะ-แกะที่เจ็บขาหรือเดินกะเผลกไว้ในคอกแห้งที่มีร่มเงา",
+          "ล้างแผลที่กีบเท้าและปากด้วยน้ำเกลือสะอาดหรือด่างทับทิม แล้วทายาม่วง (Gentian violet)",
+          "ช่วยป้อนน้ำ หญ้าอ่อน และเสริมวิตามิน",
+          "ฉีดยาปฏิชีวนะเพื่อป้องกันการติดเชื้อแบคทีเรียแทรกซ้อนที่กีบเท้า",
+          "โรยปูนขาวฆ่าเชื้อรอบคอก และห้ามเคลื่อนย้ายสัตว์"
+        ],
+        "en": [
+          "Isolate lame sheep/goats in a dry, shaded enclosure.",
+          "Clean foot and mouth lesions with clean saline or antiseptic, then apply gentian violet.",
+          "Hand-feed soft green forage, clean water, and vitamins.",
+          "Administer antibiotics to prevent secondary bacterial footrot/infections.",
+          "Apply quicklime around pens and restrict movement."
+        ]
+      }
+    },
+    {
+      "name": "Peste des Petits Ruminants (PPR)",
+      "name_lo": "ພະຍາດພີພີອາ (ພະຍາດຫ່າແບ້ແກະ)",
+      "name_th": "โรคพีพีอาร์ / กาฬโรคในแพะและแกะ (PPR)",
+      "symptoms": [
+        "High fever, depression, nasal discharge and lacrimation becoming thick/mucoid, anorexia (persisting ~14 days)",
+        "Oral mucosal hemorrhages, necrotic gum and mouth lesions, foul breath, excessive salivation",
+        "Pneumonia, respiratory distress (tachypnea, coughing), severe watery diarrhea, rapid weight loss"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກແບ້-ແກະທີ່ປ່ວຍ (ມີຂີ້ມູກ-ຂີ້ຕາໜຽວ, ຖອກທ້ອງ, ເຈັບປາກ) ອອກຈາກຝູງທັນທີ",
+          "ລ້າງປາກ ແລະ ເຊັດຂີ້ມູກ-ຂີ້ຕາດ້ວຍນ້ຳເກືອສະອາດ",
+          "ໃຫ້ນ້ຳປະສົມເກືອແຮ່ ORS ແລະ ວິຕາມິນເພື່ອຫຼຸດອາການຂາດນ້ຳຈາກການຖອກທ້ອງ",
+          "ສີດຢາຕ້ານເຊື້ອ (ເຊັ່ນ Oxytetracycline) ເພື່ອປ້ອງກັນປອດບວມແຊກຊ້ອນ ແລະ ຢາຫຼຸດໄຂ້",
+          "ຂ້າເຊື້ອຄອກດ້ວຍປູນຂາວທຸກມື້ ແລະ ຝັງຊາກສັດຕາຍໃຫ້ເລິກ",
+          "ແຈ້ງສັດຕະວະແພດເພື່ອວາງແຜນສີດວັກຊີນໃຫ້ແບ້-ແກະທີ່ຍັງແຂງແຮງ"
+        ],
+        "th": [
+          "แยกแพะ-แกะที่ป่วย (มีขี้มูก-ขี้ตาเหนียว ท้องเสีย แผลในปาก) ออกจากฝูงทันที",
+          "ล้างปากและเช็ดคราบขี้มูก-ขี้ตาด้วยน้ำเกลือสะอาด",
+          "ให้น้ำผสมผงเกลือแร่ (ORS) และวิตามินเพื่อลดภาวะขาดน้ำจากอาการท้องเสีย",
+          "ฉีดยาปฏิชีวนะ (เช่น Oxytetracycline) เพื่อป้องกันโรคปอดบวมแทรกซ้อน และยาลดไข้",
+          "ฆ่าเชื้อคอกด้วยปูนขาวทุกวัน และฝังซากสัตว์ตายให้ลึก",
+          "แจ้งสัตวแพทย์เพื่อวางแผนฉีดวัคซีนให้กับแพะ-แกะที่ยังแข็งแรง"
+        ],
+        "en": [
+          "Immediately isolate animals showing crusty nasal/ocular discharge, oral sores, or diarrhea.",
+          "Clean crusts around eyes/nostrils and oral lesions with clean saline.",
+          "Provide oral rehydration salts (ORS) and vitamins to combat dehydration.",
+          "Administer antibiotics (e.g., Oxytetracycline) to prevent secondary pneumonia, along with antipyretics.",
+          "Disinfect pens daily with quicklime and deeply bury all carcasses.",
+          "Notify veterinary authorities to initiate ring vaccination in healthy herds."
+        ]
+      }
+    }
+  ],
+  "Dog and Cat": [
+    {
+      "name": "Rabies",
+      "name_lo": "ພະຍາດວໍ້ (ພະຍາດໝາບ້າ)",
+      "name_th": "โรคพิษสุนัขบ้า (โรคกลัวน้ำ)",
+      "symptoms": [
+        "Prodromal stage (1-3 days): Behavioral changes, anxiety, pupillary dilation, licking/chewing bite wound site due to paresthesia, mild fever, anorexia",
+        "Furious stage (1-7 days): Extreme restlessness, hyper-reactivity, marked aggression (especially in cats), abnormal vocalization, ingestion of non-food items, ataxia, seizures",
+        "Paralytic / Dumb stage (2-4 days): Pharyngeal and laryngeal paralysis, dropped jaw with inability to swallow, hypersalivation/drooling, ascending paralysis from hindlimbs, respiratory failure, death within 10 days"
+      ],
+      "basic_response": {
+        "lo": [
+          "ກັກຂັງໝາ ຫຼື ແມວທີ່ສົງໄສໄວ້ໃນກົງທີ່ແຂງແຮງ ແລະ ປອດໄພເພື່ອສັງເກດອາການ 10 ວັນ",
+          "ຫ້າມເຂົ້າໃກ້ ຫຼື ສຳຜັດໂຕສັດ ແລະ ນ້ຳລາຍເດັດຂາດ",
+          "ຖ້າຄົນຖືກກັດ ຫຼື ຖືກຂູດ: ຟ້າວລ້າງບາດແຜດ້ວຍນ້ຳສະອາດ ແລະ ສະບູຫຼາຍໆຄັ້ງຢ່າງໜ້ອຍ 15 ນາທີ, ໃສ່ຢາຂ້າເຊື້ອ (Betadine) ແລະ ໄປໂຮງໝໍສັກຢາວັກຊີນວໍ້ທັນທີ",
+          "ຖ້າສັດຕາຍ ຫ້າມປາດຊາກ ຫຼື ຖິ້ມຊະຊາຍ, ໃຫ້ຝັງເລິກ 1.5–2 ແມັດ ພ້ອມໂຮຍປູນຂາວ",
+          "ແຈ້ງສັດຕະວະແພດ ແລະ ສາທາລະນະສຸກບ້ານ/ເມືອງທັນທີ"
+        ],
+        "th": [
+          "กักขังสุนัขหรือแมวต้องสงสัยไว้ในกรงที่แข็งแรงและปลอดภัยเพื่อสังเกตอาการ 10 วัน",
+          "ห้ามเข้าใกล้หรือสัมผัสตัวสัตว์และน้ำลายโดยเด็ดขาด",
+          "หากคนถูกกัดหรือข่วน: รีบล้างแผลด้วยน้ำสะอาดและสบู่หลายๆ รอบอย่างน้อย 15 นาที ใส่ยาฆ่าเชื้อ (เบตาดีน) และรีบไปโรงพยาบาลเพื่อฉีดวัคซีนป้องกันพิษสุนัขบ้าทันที",
+          "หากสัตว์ตาย ห้ามผ่าซากหรือทิ้งซากเรี่ยราด ให้ฝังลึก 1.5–2 เมตร พร้อมโรยปูนขาว",
+          "แจ้งเจ้าหน้าที่ปศุสัตว์และสาธารณสุขในพื้นที่ทันที"
+        ],
+        "en": [
+          "Safely quarantine the suspected dog or cat in a sturdy, secure cage for 10 days of observation.",
+          "Do not approach or make physical contact with the animal or its saliva.",
+          "If a person is bitten or scratched: immediately wash the wound with soap and running water for at least 15 minutes, apply povidone-iodine, and seek immediate rabies PEP vaccination at a hospital.",
+          "If the animal dies, do not open the carcass; bury it 1.5–2 meters deep with quicklime.",
+          "Notify local veterinary and public health authorities immediately."
+        ]
+      }
+    }
+  ]
+}

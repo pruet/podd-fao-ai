@@ -16,6 +16,13 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         # Guarantee database exists
         init_db()
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.cursor().execute("DELETE FROM cluster_reports")
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
         self.client = TestClient(app)
         
     @patch("main.get_genai_client")
@@ -57,6 +64,9 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res_json["is_valid_animal_image"])
         self.assertEqual(res_json["animal_type"], "Cattle")
         self.assertEqual(res_json["diseases"][0]["name"], "Foot and Mouth Disease")
+        self.assertIn("basic_response", res_json["diseases"][0])
+        self.assertIsInstance(res_json["diseases"][0]["basic_response"], list)
+        self.assertTrue(len(res_json["diseases"][0]["basic_response"]) > 0)
 
     @patch("main.get_genai_client")
     @patch("main.get_lahis_token", new_callable=AsyncMock)
@@ -475,5 +485,86 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             except Exception:
                 pass
 
+    def test_detect_cluster_missing_report_id(self):
+        response = self.client.post("/detect-cluster", data={"lang": "en"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("report_id is required", response.json()["detail"])
+
+    @patch("main.submit_lahis_cluster", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_incident_detail", new_callable=AsyncMock)
+    @patch("main.get_lahis_token", new_callable=AsyncMock)
+    @patch.dict(os.environ, {
+        "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
+        "LAHIS_CLIENT_ID": "mock_client",
+        "LAHIS_CLIENT_SECRET": "mock_secret"
+    })
+    def test_detect_cluster_threshold_and_callback(self, mock_get_token, mock_fetch_detail, mock_submit_cluster):
+        mock_get_token.return_value = "mock_token"
+        mock_submit_cluster.return_value = {"status": "accepted", "id": "cluster-111"}
+
+        # Simulate reports spanning > 14 days for village 99
+        # Report 1: Day 1 (2026-08-01)
+        # Report 2: Day 10 (2026-08-10) -> span 9 days (<= 14 days)
+        # Report 3: Day 17 (2026-08-17) -> span 16 days (> 14 days)
+        mock_fetch_detail.side_effect = [
+            {"incident": {"id": "rep-001", "incidentDate": "2026-08-01", "village": {"id": 99, "name": "Ban Na"}}},
+            {"incident": {"id": "rep-002", "incidentDate": "2026-08-10", "village": {"id": 99, "name": "Ban Na"}}},
+            {"incident": {"id": "rep-003", "incidentDate": "2026-08-17", "village": {"id": 99, "name": "Ban Na"}}}
+        ]
+
+        # 1st request -> span 0 days, cluster_detected = False
+        res1 = self.client.post("/detect-cluster", data={"report_id": "rep-001"})
+        self.assertEqual(res1.status_code, 200)
+        data1 = res1.json()
+        self.assertFalse(data1["cluster_detected"])
+        self.assertEqual(data1["span_days"], 0)
+        mock_submit_cluster.assert_not_called()
+
+        # 2nd request -> span 9 days, cluster_detected = False
+        res2 = self.client.post("/detect-cluster", data={"report_id": "rep-002"})
+        self.assertEqual(res2.status_code, 200)
+        data2 = res2.json()
+        self.assertFalse(data2["cluster_detected"])
+        self.assertEqual(data2["span_days"], 9)
+        mock_submit_cluster.assert_not_called()
+
+        # 3rd request -> span 16 days, cluster_detected = True (> 14 days)
+        res3 = self.client.post("/detect-cluster", data={"report_id": "rep-003"})
+        self.assertEqual(res3.status_code, 200)
+        data3 = res3.json()
+        self.assertTrue(data3["cluster_detected"])
+        self.assertEqual(data3["span_days"], 16)
+        mock_submit_cluster.assert_called_once()
+
+    def test_get_clusters_api(self):
+        auth_headers = {"Authorization": "Basic YWRtaW46UG9kZEZhb1NlY3VyZTIwMjYh"}
+        response = self.client.get("/api/clusters", headers=auth_headers)
+        self.assertEqual(response.status_code, 200)
+        res_json = response.json()
+        self.assertIn("stats", res_json)
+        self.assertIn("clusters", res_json)
+
+    def test_get_diseases_api(self):
+        response = self.client.get("/api/diseases")
+        self.assertEqual(response.status_code, 200)
+        diseases = response.json()
+        self.assertIn("Chicken", diseases)
+        self.assertIn("Pig", diseases)
+        chicken_disease_names = [d["name"] if isinstance(d, dict) else d for d in diseases["Chicken"]]
+        self.assertIn("Avian influenza", chicken_disease_names)
+        if isinstance(diseases["Chicken"][0], dict):
+            self.assertIn("symptoms", diseases["Chicken"][0])
+            self.assertIsInstance(diseases["Chicken"][0]["symptoms"], list)
+            self.assertIn("basic_response", diseases["Chicken"][0])
+            basic_resp = diseases["Chicken"][0]["basic_response"]
+            self.assertIn("lo", basic_resp)
+            self.assertIn("th", basic_resp)
+            self.assertIn("en", basic_resp)
+            self.assertIsInstance(basic_resp["lo"], list)
+            self.assertIsInstance(basic_resp["th"], list)
+            self.assertIsInstance(basic_resp["en"], list)
+
 if __name__ == "__main__":
     unittest.main()
+
+

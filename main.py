@@ -63,6 +63,17 @@ def init_db():
                 output_tokens INTEGER DEFAULT 0
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cluster_reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                date_str TEXT,
+                report_id TEXT,
+                village_id TEXT,
+                village_name TEXT,
+                raw_payload TEXT
+            )
+        """)
         # Run migrations if columns are missing
         cursor.execute("PRAGMA table_info(api_logs)")
         columns = [row[1] for row in cursor.fetchall()]
@@ -79,6 +90,133 @@ def init_db():
 
 # Initialize DB on load
 init_db()
+
+def record_cluster_report(report_id: str, village_id: str, village_name: Optional[str], date_str: str, raw_payload: str):
+    timestamp = datetime.utcnow().isoformat()
+    if USE_DATASTORE and datastore_client:
+        try:
+            key = datastore_client.key("ClusterReport")
+            entity = datastore.Entity(key=key, exclude_from_indexes=("raw_payload",))
+            entity.update({
+                "timestamp": timestamp,
+                "date_str": str(date_str),
+                "report_id": str(report_id),
+                "village_id": str(village_id),
+                "village_name": str(village_name or ""),
+                "raw_payload": raw_payload
+            })
+            datastore_client.put(entity)
+            return
+        except Exception as e:
+            print(f"Error logging ClusterReport to Datastore: {e}")
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO cluster_reports (timestamp, date_str, report_id, village_id, village_name, raw_payload)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (timestamp, str(date_str), str(report_id), str(village_id), str(village_name or ""), raw_payload))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving cluster report to DB: {e}")
+
+def get_village_reports_for_date(village_id: str, date_str: str) -> List[dict]:
+    if USE_DATASTORE and datastore_client:
+        try:
+            query = datastore_client.query(kind="ClusterReport")
+            query.add_filter("village_id", "=", str(village_id))
+            query.add_filter("date_str", "=", str(date_str))
+            results = list(query.fetch())
+            return [
+                {
+                    "id": entity.key.id,
+                    "timestamp": entity.get("timestamp"),
+                    "date_str": entity.get("date_str"),
+                    "report_id": entity.get("report_id"),
+                    "village_id": entity.get("village_id"),
+                    "village_name": entity.get("village_name"),
+                    "raw_payload": entity.get("raw_payload")
+                }
+                for entity in results
+            ]
+        except Exception as e:
+            print(f"Error querying ClusterReport from Datastore: {e}")
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM cluster_reports WHERE village_id = ? AND date_str = ?",
+            (str(village_id), str(date_str))
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "id": row["id"],
+                "timestamp": row["timestamp"],
+                "date_str": row["date_str"],
+                "report_id": row["report_id"],
+                "village_id": row["village_id"],
+                "village_name": row["village_name"],
+                "raw_payload": row["raw_payload"]
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"Error querying cluster reports from DB: {e}")
+        return []
+
+def get_village_all_reports(village_id: str) -> List[dict]:
+    if USE_DATASTORE and datastore_client:
+        try:
+            query = datastore_client.query(kind="ClusterReport")
+            query.add_filter("village_id", "=", str(village_id))
+            results = list(query.fetch())
+            return [
+                {
+                    "id": entity.key.id,
+                    "timestamp": entity.get("timestamp"),
+                    "date_str": entity.get("date_str"),
+                    "report_id": entity.get("report_id"),
+                    "village_id": entity.get("village_id"),
+                    "village_name": entity.get("village_name"),
+                    "raw_payload": entity.get("raw_payload")
+                }
+                for entity in results
+            ]
+        except Exception as e:
+            print(f"Error querying ClusterReport from Datastore: {e}")
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM cluster_reports WHERE village_id = ?",
+            (str(village_id),)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        return [
+            {
+                "id": row["id"],
+                "timestamp": row["timestamp"],
+                "date_str": row["date_str"],
+                "report_id": row["report_id"],
+                "village_id": row["village_id"],
+                "village_name": row["village_name"],
+                "raw_payload": row["raw_payload"]
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"Error querying cluster reports from DB: {e}")
+        return []
+
 
 security = HTTPBasic()
 
@@ -161,20 +299,56 @@ def log_request_response(method: str, path: str, status_code: int, latency: floa
         print(f"Error logging to DB: {e}")
 
 
+def load_animals_and_diseases():
+    diseases_path = os.path.join(os.path.dirname(__file__), "diseases.json")
+    if os.path.exists(diseases_path):
+        with open(diseases_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {
+        "Chicken": ["Avian influenza", "Newcastle disease", "Fowl Cholera"],
+        "Goose and Duck": ["Avian influenza", "Newcastle disease", "Fowl Cholera", "Duck Plague"],
+        "Pig": [
+            "Classical Swine Fever",
+            "African Swine Fever",
+            "Porcine Reproductive and Respiratory Syndrome (PRRS)",
+            "Leptospirosis",
+            "Rabies",
+            "Trichinellosis",
+            "Foot and Mouth Disease (FMD)"
+        ],
+        "Cattle and Buffalo": [
+            "Foot and Mouth Disease (FMD)",
+            "Haemorrhagic Septicemia",
+            "Anthrax",
+            "Black Leg",
+            "Lumpy Skin Disease",
+            "Leptospirosis",
+            "Rabies"
+        ],
+        "Sheep and Goat": [
+            "Rabies",
+            "Leptospirosis",
+            "Foot and Mouth Disease (FMD)",
+            "Peste des Petits Ruminants (PPR)"
+        ],
+        "Dog and Cat": ["Rabies"]
+    }
+
+
 def load_config():
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {
-        "guardrail_policy": "Determine if the image contains an animal or animal body part.",
-        "prompt_template": "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. List up to three possible diseases affecting the animal in the image(s).\n3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n\nConstraints:\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
+        "guardrail_policy": "Determine if the image depicts a living animal, animal carcass, or animal body parts (such as skin, mouth, organs, legs, etc.) of an animal belonging to the ALLOWED animal species list:\n{allowed_animals}\n\nValidation Rules:\n1. If the image does NOT contain any animal, carcass, or animal body part (e.g., it contains only people, vehicles, buildings, landscapes, electronic devices, food, or general household items), you MUST set `is_valid_animal_image` to False and explain why in `invalid_reason` in {lang_name} language.\n2. If the image depicts an animal species NOT in the allowed list above (such as horse, snake, elephant, monkey, wild bird, fish, etc.), you MUST set `is_valid_animal_image` to False and set `invalid_reason` to 'This is not an acceptable animal, we don't process [animal name]' translated into {lang_name} language (e.g., in Lao: 'ນີ້ບໍ່ແມ່ນສັດທີ່ຮອງຮັບ, ພວກເຮົາບໍ່ໄດ້ປະມວນຜົນ [animal name]', in Thai: 'นี่ไม่ใช่สัตว์ที่รองรับ เราไม่ประมวลผล [animal name]').\n3. If and only if it is a valid animal-related image of an allowed species, set `is_valid_animal_image` to True.\n\nSTRICT DISEASE WHITELIST GUARDRAIL:\n- ONLY diseases that appear on the allowed Priority Reportable Diseases list for the identified animal species may be considered or suggested.\n- If the observed condition, symptoms, or suspected disease does NOT match any disease on the official allowed list, or if the detected disease is outside the allowed list, you MUST NOT provide any disease response (you MUST set `diseases` to an empty list `[]`). Under NO circumstances should you name or suggest any unlisted disease.",
+        "prompt_template": "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. Evaluate symptoms ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the symptoms, list up to three with a confidence level (0.0 to 1.0), brief reasoning/symptoms observed, and basic response recommendations for local veterinarians without requiring laboratory testing in {lang_name} language.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, basic_response, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
     }
 
 app = FastAPI(
     title="FAO-PODD Animal Disease Diagnosis API",
     description="Analyze animal images and descriptions to identify potential diseases.",
-    version="2.4.1"
+    version="2.6.0"
 )
 
 # Initialize GenAI Client
@@ -194,6 +368,40 @@ class DiseaseResponse(BaseModel):
     name: str = Field(description="Name of the disease in the requested language")
     confidence: float = Field(description="Confidence level of this disease, between 0.0 and 1.0")
     reasoning: str = Field(description="Brief clinical signs or reasoning supporting this diagnosis in the requested language")
+    basic_response: Optional[List[str]] = Field(default=None, description="Basic field response recommendations for local veterinarians without requiring laboratory tests in the requested language")
+
+def get_disease_guidelines(disease_name: str, animal_type: Optional[str] = None, lang: str = "lo") -> List[str]:
+    if not disease_name:
+        return []
+    
+    data = load_animals_and_diseases()
+    target_clean = disease_name.lower().strip()
+    
+    # First search within specific animal if provided
+    animals_to_check = []
+    if animal_type:
+        for a_key in data.keys():
+            if a_key.lower() in animal_type.lower() or animal_type.lower() in a_key.lower():
+                animals_to_check.append(a_key)
+    if not animals_to_check:
+        animals_to_check = list(data.keys())
+        
+    for a_key in animals_to_check:
+        diseases = data.get(a_key, [])
+        for d in diseases:
+            if isinstance(d, dict):
+                d_name = d.get("name", "").lower()
+                d_name_lo = d.get("name_lo", "").lower()
+                d_name_th = d.get("name_th", "").lower()
+                
+                if (target_clean in d_name or d_name in target_clean or
+                    (d_name_lo and (target_clean in d_name_lo or d_name_lo in target_clean)) or
+                    (d_name_th and (target_clean in d_name_th or d_name_th in target_clean))):
+                    
+                    resp_dict = d.get("basic_response", {})
+                    if isinstance(resp_dict, dict):
+                        return resp_dict.get(lang) or resp_dict.get("lo") or resp_dict.get("en") or []
+    return []
 
 class DiagnosisResponse(BaseModel):
     is_valid_animal_image: bool = Field(description="True if the image contains an animal or animal body parts, False otherwise")
@@ -291,9 +499,31 @@ def format_diagnosis_comment(result: dict, lang: str) -> str:
         name = d.get("name")
         conf = d.get("confidence", 0.0) * 100
         reason = d.get("reasoning") or ""
-        diseases_list.append(f"- {name} ({conf:.0f}%): {reason}")
+        basic_resp = d.get("basic_response") or []
         
-    diseases_str = "\n".join(diseases_list)
+        disease_entry = f"- {name} ({conf:.0f}%): {reason}"
+        if basic_resp:
+            if lang == "lo":
+                guidelines_header = "  ຄຳແນະນຳເບື້ອງຕົ້ນ:"
+            elif lang == "th":
+                guidelines_header = "  คำแนะนำเบื้องต้น:"
+            else:
+                guidelines_header = "  Basic Guidelines:"
+            resp_lines = "\n".join(f"    * {r}" for r in basic_resp)
+            disease_entry += f"\n{guidelines_header}\n{resp_lines}"
+            
+        diseases_list.append(disease_entry)
+        
+    if not diseases_list:
+        if lang == "lo":
+            diseases_str = "- ບໍ່ພົບພະຍາດໃນລາຍການແຈ້ງເຕືອນບູລິມະສິດ"
+        elif lang == "th":
+            diseases_str = "- ไม่พบโรคในรายการที่กำหนด"
+        else:
+            diseases_str = "- None detected from priority reportable list"
+    else:
+        diseases_str = "\n".join(diseases_list)
+
     if lang == "lo":
         return f"ຜົນການວິເຄາະ AI:\n- ປະເພດສັດ: {animal_type}\n- ພະຍາດທີ່ເປັນໄປໄດ້:\n{diseases_str}"
     elif lang == "th":
@@ -338,6 +568,43 @@ async def submit_lahis_comment(report_id: str, event_id: str, body_text: str, co
             raise HTTPException(
                 status_code=502,
                 detail=f"Failed to submit comment to LAHIS: {str(e)}"
+            )
+
+async def fetch_lahis_incident_detail(report_id: str, token: str, api_url: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        incident_url = f"{api_url.rstrip('/')}/api/integrations/v1/incidents/{report_id}"
+        headers = {"Authorization": f"Bearer {token}"}
+        try:
+            response = await client.get(incident_url, headers=headers, timeout=15.0)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to fetch incident {report_id} detail from LAHIS: {str(e)}"
+            )
+
+async def submit_lahis_cluster(cluster_payload: dict, token: str, api_url: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        cluster_url = f"{api_url.rstrip('/')}/api/integrations/v1/clusters"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Idempotency-Key": cluster_payload.get("externalClusterId", f"cluster-{uuid.uuid4()}"),
+            "Content-Type": "application/json"
+        }
+        try:
+            response = await client.post(cluster_url, json=cluster_payload, headers=headers, timeout=15.0)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"LAHIS cluster API returned error: {e.response.status_code} - {e.response.text}"
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to submit cluster result to LAHIS: {str(e)}"
             )
 
 @app.post("/analyze", response_model=DiagnosisResponse)
@@ -490,12 +757,30 @@ async def analyze_animal_image(
         
         # Load guardrail policy and prompt_template from config.json
         config = load_config()
+        animals_and_diseases = load_animals_and_diseases()
+        allowed_animals_text = "\n".join(f"- {animal}" for animal in animals_and_diseases.keys())
+        disease_lines = []
+        for animal, diseases in animals_and_diseases.items():
+            if diseases and isinstance(diseases[0], dict):
+                names = [d.get("name", "") for d in diseases if isinstance(d, dict)]
+            else:
+                names = diseases
+            disease_lines.append(f"- {animal}: {', '.join(names)}")
+        allowed_diseases_text = "\n".join(disease_lines)
+
         guardrail_policy = config.get("guardrail_policy", "")
+        if "{allowed_animals}" in guardrail_policy:
+            guardrail_policy = guardrail_policy.replace("{allowed_animals}", allowed_animals_text)
+
         prompt_template = config.get(
             "prompt_template",
-            "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. List up to three possible diseases affecting the animal in the image(s).\n3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n\nConstraints:\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
+            "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. Evaluate symptoms ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the symptoms, list up to three with a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
         )
-        
+        if "{allowed_diseases}" in prompt_template:
+            prompt_template = prompt_template.replace("{allowed_diseases}", allowed_diseases_text)
+        if "{allowed_animals}" in prompt_template:
+            prompt_template = prompt_template.replace("{allowed_animals}", allowed_animals_text)
+
         try:
             prompt = prompt_template.format(
                 guardrail_policy=guardrail_policy,
@@ -528,6 +813,17 @@ async def analyze_animal_image(
         prompt_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
         output_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
         result = json.loads(response.text)
+        
+        # Enrich disease items with verified basic_response guidelines if not populated
+        if result.get("diseases"):
+            for d in result["diseases"]:
+                if not d.get("basic_response"):
+                    d["basic_response"] = get_disease_guidelines(
+                        disease_name=d.get("name", ""),
+                        animal_type=result.get("animal_type"),
+                        lang=lang
+                    )
+                    
         steps["step_3"] = {
             "title": "3. Response from Google AI",
             "data": {
@@ -654,6 +950,263 @@ async def analyze_animal_image(
         )
         raise HTTPException(status_code=500, detail=f"Error generating analysis: {str(e)}")
 
+@app.post("/detect-cluster")
+async def detect_cluster(
+    request: Request,
+    images: Optional[List[UploadFile]] = File(None, description="Optional images"),
+    report_id: Optional[str] = Form(None, description="LAHIS Report ID"),
+    description: Optional[str] = Form(None, description="Optional text description"),
+    lang: str = Form("en", description="Language for response: 'en', 'th', 'lo'")
+):
+    start_time = time.time()
+    client_ip = request.client.host if request.client else "unknown"
+    
+    request_params = {
+        "lang": lang,
+        "description": description,
+        "report_id": report_id,
+        "image_filenames": [img.filename for img in images] if images else [],
+        "source": request.headers.get("x-source", "api")
+    }
+    steps = {
+        "step_1": {
+            "title": "1. Request Received",
+            "data": request_params
+        }
+    }
+    
+    try:
+        content_type = request.headers.get("content-type", "")
+        is_json = "application/json" in content_type
+        event_id = "unknown-event"
+        raw_body_bytes = b""
+        
+        if is_json:
+            raw_body_bytes = await request.body()
+            try:
+                body = json.loads(raw_body_bytes)
+                request_params = body
+            except Exception:
+                request_params = {"raw_body": raw_body_bytes.decode("utf-8", errors="ignore")}
+                raise HTTPException(status_code=400, detail="Invalid JSON body")
+                
+            timestamp = request.headers.get("x-ohtk-timestamp", "")
+            signature = request.headers.get("x-ohtk-signature", "")
+            
+            signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
+            if signing_secret:
+                if not signature or not timestamp:
+                    raise HTTPException(status_code=401, detail="Missing signature headers")
+                
+                path = request.url.path
+                alt_path = path + "/" if not path.endswith("/") else path[:-1]
+                
+                sig_ok = verify_webhook_signature(path, timestamp, raw_body_bytes, signature)
+                if not sig_ok:
+                    sig_ok = verify_webhook_signature(alt_path, timestamp, raw_body_bytes, signature)
+                if not sig_ok:
+                    raise HTTPException(status_code=401, detail="Invalid webhook signature")
+            
+            report_data = body.get("report") or {}
+            report_id = report_data.get("id")
+            if not report_id:
+                raise HTTPException(status_code=400, detail="Missing report.id in payload")
+            event_id = body.get("eventId") or "unknown-event"
+            
+        if not report_id:
+            raise HTTPException(status_code=400, detail="report_id is required for cluster detection.")
+            
+        api_url = os.getenv("TENANT_API_URL")
+        client_id = os.getenv("LAHIS_CLIENT_ID")
+        client_secret = os.getenv("LAHIS_CLIENT_SECRET")
+        
+        if not all([api_url, client_id, client_secret]):
+            raise HTTPException(
+                status_code=500,
+                detail="LAHIS integration environment variables (TENANT_API_URL, LAHIS_CLIENT_ID, LAHIS_CLIENT_SECRET) are not fully configured."
+            )
+            
+        # Step 2: Get OAuth token & fetch incident detail from LAHIS
+        token = await get_lahis_token(client_id, client_secret, api_url)
+        incident_data = await fetch_lahis_incident_detail(report_id, token, api_url)
+        
+        steps["step_2"] = {
+            "title": "2. Fetched Incident Detail from LAHIS",
+            "data": incident_data
+        }
+        
+        incident = incident_data.get("incident") or incident_data
+        
+        # Extract village information and date
+        village_info = incident.get("village") or {}
+        village_id = village_info.get("id") or incident.get("villageId") or incident.get("village_id")
+        village_name = village_info.get("name") or incident.get("villageName") or incident.get("village_name")
+        
+        if not village_id:
+            relevant_authorities = incident.get("relevantAuthorityIds") or []
+            if relevant_authorities:
+                village_id = f"auth-{relevant_authorities[0]}"
+            elif incident.get("location"):
+                loc = incident.get("location")
+                village_id = f"loc-{loc.get('lat')},{loc.get('lon')}"
+            else:
+                village_id = "default_village"
+                
+        incident_date = incident.get("incidentDate") or datetime.utcnow().strftime("%Y-%m-%d")
+        
+        # Record this incoming request to DB
+        record_cluster_report(
+            report_id=report_id,
+            village_id=str(village_id),
+            village_name=village_name,
+            date_str=incident_date,
+            raw_payload=json.dumps(request_params)
+        )
+        
+        # Check all reports for this village across history
+        all_village_reports = get_village_all_reports(str(village_id))
+        report_count = len(all_village_reports)
+        
+        # Calculate timeline span for this village
+        report_dates = []
+        for r in all_village_reports:
+            d_str = r.get("date_str")
+            if d_str:
+                try:
+                    dt = datetime.strptime(d_str, "%Y-%m-%d")
+                    report_dates.append(dt)
+                except Exception:
+                    pass
+                    
+        if report_dates:
+            earliest_date = min(report_dates)
+            latest_date = max(report_dates)
+            span_days = (latest_date - earliest_date).days
+        else:
+            earliest_date = datetime.utcnow()
+            latest_date = datetime.utcnow()
+            span_days = 0
+            
+        cluster_detected = span_days > 14
+        cluster_response = None
+        
+        steps["step_3"] = {
+            "title": "3. Timeline Cluster Check",
+            "data": {
+                "village_id": str(village_id),
+                "village_name": village_name,
+                "earliest_date": earliest_date.strftime("%Y-%m-%d"),
+                "latest_date": latest_date.strftime("%Y-%m-%d"),
+                "span_days": span_days,
+                "report_count": report_count,
+                "cluster_detected": cluster_detected
+            }
+        }
+        
+        if cluster_detected:
+            # Collect unique incident IDs in this village
+            all_incident_ids = list(set([r["report_id"] for r in all_village_reports if r.get("report_id")]))
+            if report_id not in all_incident_ids:
+                all_incident_ids.append(report_id)
+                
+            village_id_int = int(village_id) if str(village_id).isdigit() else None
+            authority_ids = incident.get("relevantAuthorityIds") or []
+            
+            cluster_payload = {
+                "externalClusterId": f"cluster-{village_id}-{earliest_date.strftime('%Y%m%d')}-{latest_date.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
+                "algorithmVersion": "podd-cluster-detector-v2",
+                "window": {
+                    "from": earliest_date.strftime("%Y-%m-%d"),
+                    "to": latest_date.strftime("%Y-%m-%d")
+                },
+                "incidentIds": all_incident_ids,
+                "authorityIds": authority_ids,
+                "villageIds": [village_id_int] if village_id_int is not None else [],
+                "geometry": incident.get("location"),
+                "radiusMeters": 500.0,
+                "score": 1.0,
+                "riskLevel": "HIGH",
+                "explanation": f"Cluster detected: Suspected disease reports in village {village_name or village_id} continued for {span_days} days (>14 days).",
+                "metadata": {
+                    "source": "fao-podd-cluster-detector",
+                    "span_days": span_days,
+                    "report_count": report_count
+                }
+            }
+            
+            steps["step_4"] = {
+                "title": "4. Sending Cluster to LAHIS Callback",
+                "data": cluster_payload
+            }
+            
+            try:
+                cluster_response = await submit_lahis_cluster(cluster_payload, token, api_url)
+                steps["step_5"] = {
+                    "title": "5. LAHIS Callback Response",
+                    "data": cluster_response
+                }
+            except HTTPException as e:
+                steps["step_5"] = {
+                    "title": "5. LAHIS Callback Response (Error)",
+                    "data": {"status_code": e.status_code, "detail": e.detail}
+                }
+                
+        result = {
+            "status": "success",
+            "cluster_detected": cluster_detected,
+            "report_count": report_count,
+            "village_id": str(village_id),
+            "village_name": village_name,
+            "earliest_date": earliest_date.strftime("%Y-%m-%d"),
+            "latest_date": latest_date.strftime("%Y-%m-%d"),
+            "span_days": span_days,
+            "cluster_response": cluster_response
+        }
+        
+        latency = time.time() - start_time
+        log_request_response(
+            method="POST",
+            path="/detect-cluster",
+            status_code=200,
+            latency=latency,
+            client_ip=client_ip,
+            request_params=request_params,
+            response_body=json.dumps(result),
+            steps_json=steps
+        )
+        return result
+
+    except HTTPException as e:
+        latency = time.time() - start_time
+        log_request_response(
+            method="POST",
+            path="/detect-cluster",
+            status_code=e.status_code,
+            latency=latency,
+            client_ip=client_ip,
+            request_params=request_params,
+            response_body=json.dumps({"detail": e.detail}),
+            steps_json=steps
+        )
+        raise e
+    except Exception as e:
+        latency = time.time() - start_time
+        log_request_response(
+            method="POST",
+            path="/detect-cluster",
+            status_code=500,
+            latency=latency,
+            client_ip=client_ip,
+            request_params=request_params,
+            response_body=json.dumps({"detail": str(e)}),
+            steps_json=steps
+        )
+        raise HTTPException(status_code=500, detail=f"Error detecting cluster: {str(e)}")
+
+@app.get("/api/diseases")
+async def get_diseases():
+    return load_animals_and_diseases()
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_dashboard(username: str = Depends(authenticate_dashboard)):
     dashboard_path = os.path.join(os.path.dirname(__file__), "dashboard.html")
@@ -741,6 +1294,114 @@ async def get_logs(limit: int = 50, username: str = Depends(authenticate_dashboa
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch logs: {str(e)}")
+
+@app.get("/api/clusters")
+async def get_clusters(limit: int = 100, username: str = Depends(authenticate_dashboard)):
+    reports = []
+    if USE_DATASTORE and datastore_client:
+        try:
+            query = datastore_client.query(kind="ClusterReport")
+            query.order = ["-timestamp"]
+            results = list(query.fetch(limit=limit))
+            for entity in results:
+                reports.append({
+                    "id": entity.key.id,
+                    "timestamp": entity.get("timestamp"),
+                    "date_str": entity.get("date_str"),
+                    "report_id": entity.get("report_id"),
+                    "village_id": entity.get("village_id"),
+                    "village_name": entity.get("village_name"),
+                    "raw_payload": entity.get("raw_payload")
+                })
+        except Exception as e:
+            print(f"Datastore fetch cluster reports error: {e}")
+
+    if not reports:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM cluster_reports ORDER BY id DESC LIMIT ?", (limit,))
+            rows = cursor.fetchall()
+            conn.close()
+            for row in rows:
+                reports.append({
+                    "id": row["id"],
+                    "timestamp": row["timestamp"],
+                    "date_str": row["date_str"],
+                    "report_id": row["report_id"],
+                    "village_id": row["village_id"],
+                    "village_name": row["village_name"],
+                    "raw_payload": row["raw_payload"]
+                })
+        except Exception as e:
+            print(f"SQLite fetch cluster reports error: {e}")
+
+    # Group by village_id
+    groups = {}
+    for r in reports:
+        vid = r["village_id"]
+        if vid not in groups:
+            groups[vid] = {
+                "village_id": vid,
+                "village_name": r["village_name"] or "Unknown Village",
+                "reports": [],
+                "dates": [],
+                "latest_timestamp": r["timestamp"]
+            }
+        if r["report_id"] and r["report_id"] not in groups[vid]["reports"]:
+            groups[vid]["reports"].append(r["report_id"])
+        
+        d_str = r.get("date_str")
+        if d_str:
+            try:
+                dt = datetime.strptime(d_str, "%Y-%m-%d")
+                groups[vid]["dates"].append(dt)
+            except Exception:
+                pass
+
+    grouped_list = []
+    total_clusters = 0
+
+    for vid, g in groups.items():
+        if g["dates"]:
+            min_d = min(g["dates"])
+            max_d = max(g["dates"])
+            span_days = (max_d - min_d).days
+            start_date_str = min_d.strftime("%Y-%m-%d")
+            latest_date_str = max_d.strftime("%Y-%m-%d")
+        else:
+            span_days = 0
+            start_date_str = "N/A"
+            latest_date_str = "N/A"
+
+        is_cluster = span_days > 14
+        if is_cluster:
+            total_clusters += 1
+
+        grouped_list.append({
+            "village_id": vid,
+            "village_name": g["village_name"],
+            "start_date": start_date_str,
+            "latest_date": latest_date_str,
+            "span_days": span_days,
+            "report_count": len(g["reports"]),
+            "reports": g["reports"],
+            "cluster_detected": is_cluster,
+            "latest_timestamp": g["latest_timestamp"]
+        })
+
+    grouped_list.sort(key=lambda x: (x["latest_timestamp"] or ""), reverse=True)
+
+    return {
+        "stats": {
+            "total_reports": len(reports),
+            "unique_villages": len(groups),
+            "total_clusters": total_clusters
+        },
+        "clusters": grouped_list,
+        "raw_reports": reports
+    }
 
 @app.get("/api/logs/image/{filename}")
 async def get_log_image(filename: str, username: str = Depends(authenticate_dashboard)):

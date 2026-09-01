@@ -109,6 +109,42 @@
           "Properly bury or incinerate dead birds."
         ]
       }
+    },
+    {
+      "name": "Duck Plague",
+      "name_lo": "ພະຍາດກາບເປັດ (ໄຂ້ຫວັດລຳໄສ້ເປັດ)",
+      "name_th": "โรคกาบเป็ด (กาฬโรคเป็ด)",
+      "symptoms": [
+        "Depression, loss of appetite, high fever",
+        "Nasal discharge, ruffled feathers, closed eyelids, photophobia",
+        "Incoordination, tremors, recumbency with head and wings extended forward",
+        "Watery diarrhea",
+        "Subcutaneous edema of head and neck in young ducks",
+        "Petechial hemorrhages on legs and feet"
+      ],
+      "basic_response": {
+        "lo": [
+          "ແຍກເປັດປ່ວຍອອກທັນທີ ແລະ ຫ້າມປ່ອຍເປັດລົງແຫຼ່ງນ້ຳສາທາລະນະ",
+          "ໃຫ້ນ້ຳສະອາດປະສົມວິຕາມິນລະລາຍນ້ຳເພື່ອຊ່ວຍຫຼຸດຄວາມຕຶງຄຽດ",
+          "ອະນາໄມຄອກ ແລະ ໂຮຍປູນຂາວຂ້າເຊື້ອຢ່າງທົ່ວເຖິງ",
+          "ຝັງຊາກເປັດຕາຍໃຫ້ເລິກ ຫ້າມຖິ້ມຊາກລົງນ້ຳຢ່າງເດັດຂາດ",
+          "ສີດວັກຊີນປ້ອງກັນພະຍາດກາບເປັດໃຫ້ແກ່ເປັດທີ່ຍັງແຂງແຮງໃນພື້ນທີ່"
+        ],
+        "th": [
+          "แยกเป็ดป่วยออกทันที และห้ามปล่อยเป็ดลงแหล่งน้ำสาธารณะ",
+          "ให้น้ำสะอาดผสมวิตามินละลายน้ำเพื่อลดความเครียดและเสริมความแข็งแรง",
+          "ทำความสะอาดคอกและโรยปูนขาวฆ่าเชื้ออย่างทั่วถึง",
+          "ฝังซากเป็ดตายให้ลึก ห้ามทิ้งซากลงน้ำโดยเด็ดขาด",
+          "ฉีดวัคซีนป้องกันโรคกาบเป็ดให้กับเป็ดที่ยังแข็งแรงในพื้นที่"
+        ],
+        "en": [
+          "Immediately isolate sick ducks and keep them away from communal water sources.",
+          "Provide clean drinking water with soluble multivitamins to reduce stress.",
+          "Thoroughly clean pens and apply quicklime.",
+          "Bury dead ducks deeply; never dump carcasses into water.",
+          "Vaccinate healthy ducks in the area against Duck Viral Enteritis (Duck Plague)."
+        ]
+      }
     }
   ],
   "Goose and Duck": [

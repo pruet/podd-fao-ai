@@ -212,6 +212,25 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.toBeInstance = isinstance(response.json(), list)
         self.assertTrue(self.toBeInstance)
 
+        # 3. Test export endpoint
+        # Unauthorized check
+        response = self.client.get("/api/logs/export")
+        self.assertEqual(response.status_code, 401)
+
+        # JSON export
+        response = self.client.get("/api/logs/export?format=json", auth=("admin", "PoddFaoSecure2026!"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/json", response.headers["content-type"])
+        self.assertIn("attachment; filename=", response.headers.get("content-disposition", ""))
+        self.assertTrue(isinstance(response.json(), list))
+
+        # CSV export
+        response = self.client.get("/api/logs/export?format=csv", auth=("admin", "PoddFaoSecure2026!"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response.headers["content-type"])
+        self.assertIn("attachment; filename=", response.headers.get("content-disposition", ""))
+        self.assertIn("timestamp,method,path", response.text)
+
     @patch("main.get_genai_client")
     @patch("main.get_lahis_token", new_callable=AsyncMock)
     @patch("main.fetch_lahis_report_images", new_callable=AsyncMock)
@@ -564,7 +583,164 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(basic_resp["th"], list)
             self.assertIsInstance(basic_resp["en"], list)
 
+    def test_privacy_policy_endpoint(self):
+        response = self.client.get("/privacy")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Privacy Policy for FAO-PODD", response.text)
+        self.assertIn("Data Deletion", response.text)
+
+    def test_get_symptoms_api(self):
+        response = self.client.get("/api/symptoms")
+        self.assertEqual(response.status_code, 200)
+        symptoms = response.json()
+        self.assertEqual(len(symptoms), 46)
+        first = symptoms[0]
+        self.assertEqual(first["no"], 1)
+        self.assertEqual(first["category"], "Skin / External Signs")
+        self.assertEqual(first["symptom_name_en"], "Dry skin/Rough hair coat")
+        self.assertEqual(first["symptom_name_lo"], "ຜິວໜັງແຫ້ງ/ຂົນຫຍອງ")
+        self.assertIn("Chicken", first)
+        self.assertIn("Pig", first)
+
+    def test_landing_page_endpoint(self):
+        for path in ["/home", "/about", "/landing", "/index.html"]:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("Pruet Boonma", response.text)
+            self.assertIn("Project Owner", response.text)
+            self.assertIn("FAO-PODD V.2", response.text)
+
+    @patch("main.get_genai_client")
+    def test_analyze_text_only_symptom_consultation(self, mock_get_client):
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.usage_metadata = None
+        mock_response.text = json.dumps({
+            "matched_symptom_numbers": [2],
+            "symptom_analysis": "Cattle showing oral and foot lesions; require isolation and topical treatment."
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+
+        response = self.client.post(
+            "/analyze",
+            data={
+                "animal_type": "Cattle",
+                "description": "Blisters and sores on mouth and feet",
+                "lang": "en"
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["is_valid_animal_image"])
+        self.assertIsNone(data["invalid_reason"])
+        self.assertEqual(data["animal_type"], "Cattle")
+        self.assertEqual(data["diseases"], [])
+        self.assertIsNotNone(data["symptom_guidance"])
+        self.assertGreater(len(data["symptom_guidance"]), 0)
+        # Verify that symptom guidance includes the advice from symptom.json for symptom #2
+        self.assertTrue(any("Blisters/sores" in g or "mouth" in g.lower() for g in data["symptom_guidance"]))
+
+    @patch("main.get_genai_client")
+    def test_analyze_text_only_symptom_consultation_thai(self, mock_get_client):
+        mock_genai_client = MagicMock()
+        mock_response_ai = MagicMock()
+        mock_response_ai.usage_metadata = None
+        mock_response_ai.text = json.dumps({
+            "matched_symptom_numbers": [2],
+            "symptom_analysis": "วัวมีแผลที่ปากและเท้า ควรแยกสัตว์และทำแผล",
+            "symptom_guidance_entries": [
+                "[มีตุ่มพองหรือแผลที่ปาก เท้า หรือเต้านม] คำแนะนำ: ตรวจดูตุ่มพองหรือแผลสดที่ปากและกีบเท้า แยกสัตว์ป่วยและแจ้งเจ้าหน้าที่"
+            ]
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response_ai
+        mock_get_client.return_value = mock_genai_client
+
+        response = self.client.post(
+            "/analyze",
+            data={
+                "animal_type": "Cattle",
+                "description": "มีแผลพุพองที่ปากและกีบเท้า",
+                "lang": "th"
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["is_valid_animal_image"])
+        self.assertEqual(data["diseases"], [])
+        self.assertGreater(len(data["symptom_guidance"]), 1)
+        self.assertIn("วัวมีแผลที่ปากและเท้า", data["symptom_guidance"][0])
+        self.assertIn("มีตุ่มพองหรือแผลที่ปาก", data["symptom_guidance"][1])
+
+    def test_analyze_text_only_unsupported_animal(self):
+        response = self.client.post(
+            "/analyze",
+            data={
+                "animal_type": "Elephant",
+                "description": "Sick elephant with lethargy",
+                "lang": "en"
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertFalse(data["is_valid_animal_image"])
+        self.assertIn("not an acceptable animal", data["invalid_reason"])
+        self.assertEqual(data["diseases"], [])
+
+    def test_analyze_text_only_missing_animal(self):
+        response = self.client.post(
+            "/analyze",
+            data={
+                "description": "Limping and coughing",
+                "lang": "en"
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Either image files or report_id must be provided", response.json()["detail"])
+
+    @patch("main.GCS_IMAGE_BUCKET", "test-bucket")
+    @patch("main.get_storage_client")
+    def test_save_and_retrieve_audit_image_gcs(self, mock_get_storage):
+        from main import save_audit_image, get_audit_image_bytes, LOGS_DIR
+        mock_storage = MagicMock()
+        mock_bucket = MagicMock()
+        mock_blob = MagicMock()
+        mock_storage.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.exists.return_value = True
+        mock_blob.download_as_bytes.return_value = b"test_gcs_audit_image_bytes"
+        mock_get_storage.return_value = mock_storage
+
+        test_filename = "audit_unit_test_img.jpg"
+        save_audit_image(b"test_gcs_audit_image_bytes", test_filename)
+        mock_blob.upload_from_string.assert_called_once()
+
+        # Remove local file to simulate GAE instance restart / scaled to 0
+        local_path = os.path.join(LOGS_DIR, "images", test_filename)
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
+        # Retrieve bytes (should fetch from GCS)
+        retrieved = get_audit_image_bytes(test_filename)
+        self.assertEqual(retrieved, b"test_gcs_audit_image_bytes")
+
+        # Test endpoint
+        response = self.client.get(
+            f"/api/logs/image/{test_filename}",
+            headers={"Authorization": "Basic YWRtaW46UG9kZEZhb1NlY3VyZTIwMjYh"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"test_gcs_audit_image_bytes")
+
+        # Cleanup
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
 if __name__ == "__main__":
     unittest.main()
+
+
+
+
 
 

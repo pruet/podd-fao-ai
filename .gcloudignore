@@ -14,3 +14,8 @@ __pycache__/
 
 # Ignore local unit tests and test configs
 test_main.py
+
+# Ignore local sqlite DB and image logs
+api_logs.db
+logs/
+logs*.txt

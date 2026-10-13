@@ -232,11 +232,92 @@
             font-size: 0.85rem;
             cursor: pointer;
             transition: background 0.2s, border-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            text-decoration: none;
         }
 
         .refresh-btn:hover {
             background: rgba(255, 255, 255, 0.1);
             border-color: rgba(0, 242, 254, 0.4);
+        }
+
+        .export-btn {
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--accent-color);
+        }
+
+        .export-btn:hover {
+            background: rgba(0, 242, 254, 0.2);
+            border-color: var(--accent-color);
+        }
+
+        /* Pagination Styles */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            min-width: 34px;
+            height: 34px;
+            padding: 0 0.5rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(0, 242, 254, 0.4);
+            color: var(--accent-color);
+        }
+
+        .page-btn.active {
+            background: var(--accent-color);
+            color: #000000;
+            font-weight: 700;
+            border-color: var(--accent-color);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .page-size-select {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
         }
 
         /* Table Styles */
@@ -458,7 +539,49 @@
             border-bottom-color: var(--accent-color);
         }
 
-        /* Tester Grid */
+        /* Tester Grid & Mode Toggle */
+        .tester-mode-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 1.5rem;
+            gap: 4px;
+        }
+
+        :root.light-mode .tester-mode-toggle {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .tester-mode-btn {
+            flex: 1;
+            padding: 0.65rem 0.75rem;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+        }
+
+        .tester-mode-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tester-mode-btn.active {
+            background: var(--accent-color);
+            color: #000000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
         .tester-grid {
             display: grid;
             grid-template-columns: 1.2fr 1.8fr;
@@ -667,10 +790,13 @@
                 <div class="logo-icon">F</div>
                 <div class="logo-title">
                     <h1>FAO-PODD Diagnostics</h1>
-                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.6.2</span></p>
+                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.6.3</span></p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
+                <a href="/about" style="text-decoration: none; color: var(--text-primary); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); padding: 0.5rem 1rem; border-radius: 30px; font-size: 0.85rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem;">
+                    <span>🌐</span> Public Site
+                </a>
                 <button class="theme-toggle-btn" onclick="toggleTheme()">
                     <span id="theme-icon">🌙</span> <span id="theme-text">Dark Mode</span>
                 </button>
@@ -679,6 +805,7 @@
                     API Monitor Connected
                 </div>
             </div>
+
         </header>
 
         <!-- Tabs Navigation -->
@@ -713,7 +840,20 @@
             <div class="panel">
                 <div class="panel-header">
                     <div class="panel-title">Recent Requests</div>
-                    <button class="refresh-btn" onclick="fetchLogs()">Manual Refresh</button>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <button class="refresh-btn export-btn" onclick="exportAllLogs('json')" title="Export all historical logs as JSON">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export JSON
+                        </button>
+                        <button class="refresh-btn export-btn" onclick="exportAllLogs('csv')" title="Export all historical logs as CSV for Excel/Sheets">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export CSV
+                        </button>
+                        <button class="refresh-btn" onclick="fetchLogs()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            Manual Refresh
+                        </button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table>
@@ -732,6 +872,25 @@
                             <!-- Filled by JS -->
                         </tbody>
                     </table>
+                </div>
+                <!-- Pagination Footer -->
+                <div class="pagination-container" id="logs-pagination">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span id="pagination-info">Showing 0 of 0</span>
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span>Per page:</span>
+                            <select id="logs-page-size" class="page-size-select" onchange="changePageSize(this.value)">
+                                <option value="10">10</option>
+                                <option value="15" selected>15</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pagination-controls" id="pagination-buttons">
+                        <!-- Filled by JS -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -813,27 +972,59 @@
                     <div class="tester-grid">
                         <!-- Left Form Column -->
                         <div class="panel-body" style="padding: 0;">
+                            <!-- Tester Mode Selector -->
+                            <div class="tester-mode-toggle">
+                                <button type="button" class="tester-mode-btn active" id="btn-mode-image" onclick="setTesterMode('image')">
+                                    📷 Image Analysis
+                                </button>
+                                <button type="button" class="tester-mode-btn" id="btn-mode-text" onclick="setTesterMode('text')">
+                                    📝 Text-Only Symptoms
+                                </button>
+                            </div>
+
                             <form id="tester-form" onsubmit="runDiagnosis(event)">
-                                <div class="form-group">
-                                    <label class="form-label">Animal Image</label>
-                                    <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
-                                        <div class="upload-area-icon">📸</div>
-                                        <div style="font-weight: 500; color: var(--text-primary);">Drag & Drop your images here</div>
-                                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">or click to browse from device</div>
-                                        <input type="file" id="file-input" accept="image/*" multiple style="display: none;" onchange="handleFileSelect(event)">
-                                        <div id="previews-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem;"></div>
+                                <!-- Image & Report ID Section (Hidden in text-only mode) -->
+                                <div id="image-inputs-group">
+                                    <div class="form-group">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                            <label class="form-label" style="margin-bottom: 0;">Animal Image</label>
+                                            <button type="button" id="clear-images-btn" onclick="clearSelectedImages(event)" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 2px 8px; color: #ef4444; font-size: 0.75rem; font-weight: 600; cursor: pointer;">✕ Remove Images</button>
+                                        </div>
+                                        <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                                            <div class="upload-area-icon">📸</div>
+                                            <div style="font-weight: 500; color: var(--text-primary);">Drag & Drop your images here</div>
+                                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">or click to browse from device</div>
+                                            <input type="file" id="file-input" accept="image/*" multiple style="display: none;" onchange="handleFileSelect(event)">
+                                            <div id="previews-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 1rem;"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group" style="text-align: center; font-weight: 600; color: var(--text-secondary); margin: 0.75rem 0;">
+                                        — OR —
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label class="form-label" for="report-id-input">LAHIS Report ID</label>
+                                        <input type="text" class="form-input" id="report-id-input" placeholder="e.g. 12345 (to fetch image from LAHIS)">
                                     </div>
                                 </div>
                                 
-                                <div class="form-group" style="text-align: center; font-weight: 600; color: var(--text-secondary); margin: 1rem 0;">
-                                    — OR —
-                                </div>
-                                
                                 <div class="form-group">
-                                    <label class="form-label" for="report-id-input">LAHIS Report ID</label>
-                                    <input type="text" class="form-input" id="report-id-input" placeholder="e.g. 12345 (to fetch image from LAHIS)">
+                                    <label class="form-label" for="animal-select" id="animal-select-label">Animal Species <span id="animal-required-tag" style="color: var(--text-secondary); font-weight: 400; text-transform: none;">(Optional with image)</span></label>
+                                    <select class="form-select" id="animal-select">
+                                        <option value="">-- Select Animal Species --</option>
+                                        <option value="Cattle">Cattle (ງົວ / วัว)</option>
+                                        <option value="Buffalo">Buffalo (ຄວາຍ / ควาย)</option>
+                                        <option value="Pig">Pig (ໝູ / หมู)</option>
+                                        <option value="Chicken">Chicken (ໄກ່ / ไก่)</option>
+                                        <option value="Duck">Duck (ເປັດ / เป็ด)</option>
+                                        <option value="Goose">Goose (ຫ່ານ / ห่าน)</option>
+                                        <option value="Sheep and Goat">Sheep and Goat (ແກະ/ແບ້ / แกะ/แพะ)</option>
+                                        <option value="Dog">Dog (ໝາ / สุนัข)</option>
+                                        <option value="Cat">Cat (ແມວ / แมว)</option>
+                                    </select>
                                 </div>
-                                
+
                                 <div class="form-group">
                                     <label class="form-label" for="lang-select">Language</label>
                                     <select class="form-select" id="lang-select">
@@ -844,13 +1035,13 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label class="form-label" for="desc-textarea">Description / Symptoms</label>
+                                    <label class="form-label" for="desc-textarea" id="desc-label">Description / Symptoms <span id="desc-required-tag" style="color: var(--text-secondary); font-weight: 400; text-transform: none;">(Optional with image)</span></label>
                                     <textarea class="form-textarea" id="desc-textarea" placeholder="e.g. Animal is limping and has mouth sores..."></textarea>
                                 </div>
                                 
                                 <button type="submit" class="submit-btn" id="submit-btn">
                                     <span class="spinner" id="btn-spinner"></span>
-                                    <span id="btn-text">Run AI Diagnosis</span>
+                                    <span id="btn-text">Run AI Disease Diagnosis</span>
                                 </button>
                             </form>
                         </div>
@@ -863,7 +1054,7 @@
                             <div class="result-empty" id="result-empty-state">
                                 <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;">🧬</div>
                                 <div style="font-weight: 500; color: var(--text-primary);">No Diagnosis Data</div>
-                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">Upload an image or enter a Report ID, then click Run AI Diagnosis to analyze.</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;" id="empty-state-text">Upload an image or enter a Report ID, then click Run AI Disease Diagnosis to analyze.</div>
                             </div>
 
                             <!-- Results Container -->
@@ -938,18 +1129,41 @@
 
     <script>
         let currentLogs = [];
+        let currentPage = 1;
+        let pageSize = 15;
 
         async function fetchLogs() {
             try {
-                const response = await fetch('/api/logs');
+                // Fetch up to 1000 logs for rich historical view and client-side fast paging
+                const response = await fetch('/api/logs?limit=1000');
                 if (!response.ok) throw new Error('Network error');
                 const logs = await response.json();
                 currentLogs = logs;
-                renderLogs(logs);
+                currentPage = 1;
+                renderLogs();
                 calculateStats(logs);
             } catch (err) {
                 console.error('Failed to fetch logs:', err);
             }
+        }
+
+        function changePageSize(newSize) {
+            pageSize = parseInt(newSize, 10) || 15;
+            currentPage = 1;
+            renderLogs();
+        }
+
+        function goToPage(page) {
+            const totalPages = Math.ceil(currentLogs.length / pageSize) || 1;
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            currentPage = page;
+            renderLogs();
+        }
+
+        function exportAllLogs(format) {
+            // Trigger download from backend export endpoint
+            window.location.href = `/api/logs/export?format=${encodeURIComponent(format)}`;
         }
 
         const USD_TO_THB = 35.0; // 1 USD = 35 THB
@@ -961,20 +1175,39 @@
             return usd * USD_TO_THB * 10;
         }
 
-        function renderLogs(logs) {
+        function renderLogs() {
             const tbody = document.getElementById('logs-tbody');
-            if (!logs || !Array.isArray(logs) || logs.length === 0) {
+            const logs = currentLogs;
+            const total = logs ? logs.length : 0;
+
+            if (!logs || !Array.isArray(logs) || total === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No requests logged yet.</td></tr>';
+                renderPagination(0, 0, 0, 1, 1);
                 return;
             }
 
-            tbody.innerHTML = logs.map((log, index) => {
+            const totalPages = Math.ceil(total / pageSize) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, total);
+            const pageLogs = logs.slice(startIndex, endIndex);
+
+            tbody.innerHTML = pageLogs.map((log, pageIdx) => {
+                const globalIndex = startIndex + pageIdx;
                 let timeStr = 'N/A';
+                let timeLocalStr = '';
                 if (log && log.timestamp) {
                     try {
-                        const date = new Date(log.timestamp);
+                        let rawTs = String(log.timestamp).trim();
+                        // If raw timestamp does not have 'Z' or timezone offset (+/-), treat as UTC
+                        if (!rawTs.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(rawTs)) {
+                            rawTs += 'Z';
+                        }
+                        const date = new Date(rawTs);
                         if (!isNaN(date.getTime())) {
                             timeStr = date.toISOString().replace('T', ' ').substring(0, 19);
+                            timeLocalStr = date.toLocaleString();
                         }
                     } catch (e) {}
                 }
@@ -1015,8 +1248,8 @@
                 const latencyNum = (log && typeof log.latency === 'number' && !isNaN(log.latency)) ? log.latency : 0;
 
                 return `
-                    <tr onclick="openModal(${index})">
-                        <td>${timeStr}</td>
+                    <tr onclick="openModal(${globalIndex})">
+                        <td title="Local time: ${timeLocalStr}">${timeStr}</td>
                         <td>
                             <span style="font-weight: 600; color: var(--accent-color);">${(log && log.method) || 'POST'}</span>
                             ${sourceBadge}
@@ -1031,6 +1264,53 @@
                     </tr>
                 `;
             }).join('');
+
+            renderPagination(startIndex + 1, endIndex, total, currentPage, totalPages);
+        }
+
+        function renderPagination(start, end, total, page, totalPages) {
+            const infoEl = document.getElementById('pagination-info');
+            const buttonsEl = document.getElementById('pagination-buttons');
+            if (!infoEl || !buttonsEl) return;
+
+            if (total === 0) {
+                infoEl.innerText = 'Showing 0 of 0';
+                buttonsEl.innerHTML = '';
+                return;
+            }
+
+            infoEl.innerText = `Showing ${start}–${end} of ${total}`;
+
+            let html = '';
+            // Previous button
+            html += `<button class="page-btn" onclick="goToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''} title="Previous Page">&laquo;</button>`;
+
+            // Dynamic page numbers (compact window around current page)
+            const maxVisible = 5;
+            let startPage = Math.max(1, page - Math.floor(maxVisible / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            if (endPage - startPage + 1 < maxVisible) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
+                if (startPage > 2) html += `<span style="padding: 0 4px; color: var(--text-secondary);">...</span>`;
+            }
+
+            for (let p = startPage; p <= endPage; p++) {
+                html += `<button class="page-btn ${p === page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) html += `<span style="padding: 0 4px; color: var(--text-secondary);">...</span>`;
+                html += `<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            // Next button
+            html += `<button class="page-btn" onclick="goToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''} title="Next Page">&raquo;</button>`;
+
+            buttonsEl.innerHTML = html;
         }
 
         function calculateStats(logs) {
@@ -1321,6 +1601,70 @@
             }, false);
         }
 
+        let currentTesterMode = 'image'; // 'image' or 'text'
+
+        function setTesterMode(mode) {
+            currentTesterMode = mode;
+            const btnImage = document.getElementById('btn-mode-image');
+            const btnText = document.getElementById('btn-mode-text');
+            const imageGroup = document.getElementById('image-inputs-group');
+            const animalTag = document.getElementById('animal-required-tag');
+            const descTag = document.getElementById('desc-required-tag');
+            const btnTextSpan = document.getElementById('btn-text');
+            const descTextarea = document.getElementById('desc-textarea');
+            const emptyStateText = document.getElementById('empty-state-text');
+
+            if (mode === 'text') {
+                if (btnImage) btnImage.classList.remove('active');
+                if (btnText) btnText.classList.add('active');
+                if (imageGroup) imageGroup.style.display = 'none';
+                clearSelectedImages();
+                const reportIdInput = document.getElementById('report-id-input');
+                if (reportIdInput) reportIdInput.value = '';
+                if (animalTag) {
+                    animalTag.innerText = '*(Required)';
+                    animalTag.style.color = '#ef4444';
+                    animalTag.style.fontWeight = '700';
+                }
+                if (descTag) {
+                    descTag.innerText = '*(Required)';
+                    descTag.style.color = '#ef4444';
+                    descTag.style.fontWeight = '700';
+                }
+                if (btnTextSpan) btnTextSpan.innerText = 'Consult Symptom Guide (symptom.json)';
+                if (descTextarea) descTextarea.placeholder = 'e.g. Swollen joints, loss of appetite, coughing (will consult symptom handbook without diagnosing diseases)...';
+                if (emptyStateText) emptyStateText.innerText = 'Select animal species and enter observed symptoms, then click Consult Symptom Guide.';
+            } else {
+                if (btnText) btnText.classList.remove('active');
+                if (btnImage) btnImage.classList.add('active');
+                if (imageGroup) imageGroup.style.display = 'block';
+                if (animalTag) {
+                    animalTag.innerText = '(Optional with image)';
+                    animalTag.style.color = 'var(--text-secondary)';
+                    animalTag.style.fontWeight = '400';
+                }
+                if (descTag) {
+                    descTag.innerText = '(Optional with image)';
+                    descTag.style.color = 'var(--text-secondary)';
+                    descTag.style.fontWeight = '400';
+                }
+                if (btnTextSpan) btnTextSpan.innerText = 'Run AI Disease Diagnosis';
+                if (descTextarea) descTextarea.placeholder = 'e.g. Animal is limping and has mouth sores...';
+                if (emptyStateText) emptyStateText.innerText = 'Upload an image or enter a Report ID, then click Run AI Disease Diagnosis to analyze.';
+            }
+        }
+
+        function clearSelectedImages(event) {
+            if (event) event.stopPropagation();
+            selectedFiles = [];
+            const previews = document.getElementById('previews-container');
+            if (previews) previews.innerHTML = '';
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+            const clearBtn = document.getElementById('clear-images-btn');
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
+
         function handleFileSelect(event) {
             const files = event.target.files;
             if (files.length > 0) {
@@ -1332,6 +1676,9 @@
         function showPreviews(files) {
             const container = document.getElementById('previews-container');
             container.innerHTML = '';
+            const clearBtn = document.getElementById('clear-images-btn');
+            if (clearBtn) clearBtn.style.display = files.length > 0 ? 'inline-block' : 'none';
+
             files.forEach(file => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -1355,13 +1702,32 @@
         async function runDiagnosis(event) {
             event.preventDefault();
 
-            const reportId = document.getElementById('report-id-input').value.trim();
+            const reportId = document.getElementById('report-id-input') ? document.getElementById('report-id-input').value.trim() : '';
+            const animalType = document.getElementById('animal-select') ? document.getElementById('animal-select').value : '';
             const lang = document.getElementById('lang-select').value;
             const description = document.getElementById('desc-textarea').value.trim();
 
-            if (selectedFiles.length === 0 && !reportId) {
-                alert('Please upload one or more images or provide a LAHIS Report ID.');
-                return;
+            if (currentTesterMode === 'text') {
+                if (!animalType) {
+                    alert('Please select an Animal Species for text symptom consultation.');
+                    document.getElementById('animal-select').focus();
+                    return;
+                }
+                if (!description) {
+                    alert('Please enter a Description of observed signs/symptoms.');
+                    document.getElementById('desc-textarea').focus();
+                    return;
+                }
+            } else {
+                const hasImages = (selectedFiles && selectedFiles.length > 0) || reportId;
+                if (!hasImages) {
+                    if (description && animalType) {
+                        setTesterMode('text');
+                    } else {
+                        alert('Please upload an image, enter a Report ID, or switch to "Text-Only Symptoms" mode.');
+                        return;
+                    }
+                }
             }
 
             const submitBtn = document.getElementById('submit-btn');
@@ -1370,19 +1736,22 @@
             const resultEmpty = document.getElementById('result-empty-state');
             const resultDisplay = document.getElementById('result-display-container');
 
+            const isTextOnly = currentTesterMode === 'text' || (!selectedFiles.length && !reportId);
+
             // Set loading state
             submitBtn.disabled = true;
             spinner.style.display = 'inline-block';
-            btnText.innerText = 'Analyzing animal...';
+            btnText.innerText = isTextOnly ? 'Consulting symptom guide...' : 'Analyzing animal...';
 
             const formData = new FormData();
             formData.append('lang', lang);
-            if (selectedFiles.length > 0) {
+            if (!isTextOnly && selectedFiles.length > 0) {
                 selectedFiles.forEach(file => {
                     formData.append('images', file);
                 });
             }
-            if (reportId) formData.append('report_id', reportId);
+            if (!isTextOnly && reportId) formData.append('report_id', reportId);
+            if (animalType) formData.append('animal_type', animalType);
             if (description) formData.append('description', description);
 
             try {
@@ -1405,22 +1774,63 @@
                 resultEmpty.style.display = 'none';
                 resultDisplay.style.display = 'block';
 
+                // Localized UI strings
+                const i18n = {
+                    en: {
+                        validSymptom: 'Valid Symptom Consultation',
+                        validImage: 'Valid Animal Image',
+                        invalidImage: 'Invalid Image / Unsupported Animal',
+                        basicResponse: 'Basic Response:',
+                        confidence: 'Confidence',
+                        consultNoticeTitle: 'Text-Only Symptom Consultation:',
+                        consultNoticeBody: 'Guidance retrieved directly from official handbook (<code>symptom.json</code>). Per surveillance protocol, no specific disease is diagnosed without image verification.',
+                        guidanceHeader: '📋 Symptom Guidance (symptom.json)',
+                        noResults: 'No specific diseases or symptom guidance identified.'
+                    },
+                    th: {
+                        validSymptom: 'การให้คำปรึกษาตามอาการ (ผ่านเกณฑ์)',
+                        validImage: 'รูปภาพสัตว์ที่ถูกต้อง',
+                        invalidImage: 'รูปภาพไม่ถูกต้อง / สัตว์ไม่รองรับ',
+                        basicResponse: 'คำแนะนำเบื้องต้น:',
+                        confidence: 'ความเชื่อมั่น',
+                        consultNoticeTitle: 'การให้คำปรึกษาตามอาการ (ข้อความเท่านั้น):',
+                        consultNoticeBody: 'คำแนะนำอ้างอิงจากคู่มืออาการมาตรฐาน (<code>symptom.json</code>) ตามแนวทางการเฝ้าระวังโรค จะไม่มีการวินิจฉัยระบุชื่อโรคโดยไม่มีการตรวจสอบจากรูปภาพ',
+                        guidanceHeader: '📋 คำแนะนำการดูแลตามอาการ (symptom.json)',
+                        noResults: 'ไม่พบโรคที่ตรงตามเกณฑ์หรือคำแนะนำอาการ'
+                    },
+                    lo: {
+                        validSymptom: 'ການໃຫ້ຄຳປຶກສາຕາມອາການ (ຖືກຕ້ອງ)',
+                        validImage: 'ຮູບພາບສັດທີ່ຖືກຕ້ອງ',
+                        invalidImage: 'ຮູບພາບບໍ່ຖືກຕ້ອງ / ສັດບໍ່ຮອງຮັບ',
+                        basicResponse: 'ຄຳແນະນຳເບື້ອງຕົ້ນ:',
+                        confidence: 'ຄວາມເຊື່ອໝັ້ນ',
+                        consultNoticeTitle: 'ການໃຫ້ຄຳປຶກສາຕາມອາການ (ຂໍ້ຄວາມເທົ່ານັ້ນ):',
+                        consultNoticeBody: 'ຄຳແນະນຳອ້າງອີງຈາກປຶ້ມຄູ່ມືອາການມາດຕະຖານ (<code>symptom.json</code>). ຕາມມາດຕະການເຝົ້າລະວັງ, ຈະບໍ່ມີການວິນິດໄສລະບຸຊື່ພະຍາດຖ້າບໍ່ມີການກວດສອບຈາກຮູບພາບ.',
+                        guidanceHeader: '📋 ຄຳແນະນຳການເບິ່ງແຍງອາການ (symptom.json)',
+                        noResults: 'ບໍ່ພົບພະຍາດທີ່ກົງກັບເງື່ອນໄຂ ຫຼື ຄຳແນະນຳອາການ'
+                    }
+                };
+                const uiLang = i18n[lang] || i18n['en'];
+
                 document.getElementById('result-animal-type').innerText = result.animal_type || 'Unknown';
                 
                 const validBadge = document.getElementById('result-valid-badge');
                 if (result.is_valid_animal_image) {
-                    validBadge.innerText = 'Valid Animal Image';
+                    validBadge.innerText = isTextOnly ? uiLang.validSymptom : uiLang.validImage;
                     validBadge.classList.remove('invalid');
                 } else {
-                    validBadge.innerText = result.invalid_reason || 'Invalid Image';
+                    validBadge.innerText = result.invalid_reason || uiLang.invalidImage;
                     validBadge.classList.add('invalid');
                 }
 
-                // Render diseases list
+                // Render diseases and symptom guidance list
                 const list = document.getElementById('result-diseases-list');
                 list.innerHTML = '';
 
+                let hasRenderedContent = false;
+
                 if (result.diseases && result.diseases.length > 0) {
+                    hasRenderedContent = true;
                     result.diseases.forEach(d => {
                         const score = Math.round(d.confidence * 100);
                         let badgeColor = '#ef4444'; // Red
@@ -1433,22 +1843,64 @@
                             badgeBg = 'rgba(251, 191, 36, 0.15)';
                         }
 
+                        let basicRespStr = '';
+                        if (d.basic_response && d.basic_response.length > 0) {
+                            basicRespStr = `
+                                <div style="margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed var(--border-color); font-size: 0.85rem;">
+                                    <div style="font-weight: 600; color: var(--accent-color); margin-bottom: 0.25rem;">${uiLang.basicResponse}</div>
+                                    <ul style="margin: 0; padding-left: 1.2rem; color: var(--text-secondary);">
+                                        ${d.basic_response.map(r => `<li>${r}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            `;
+                        }
+
                         list.innerHTML += `
                             <div class="disease-card">
                                 <div class="disease-card-header">
                                     <span class="disease-name">${d.name}</span>
-                                    <span class="disease-confidence" style="color: ${badgeColor}; background: ${badgeBg};">${score}% Confidence</span>
+                                    <span class="disease-confidence" style="color: ${badgeColor}; background: ${badgeBg};">${score}% ${uiLang.confidence}</span>
                                 </div>
                                 <div style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;">
                                     ${d.reasoning || ''}
                                 </div>
+                                ${basicRespStr}
                             </div>
                         `;
                     });
-                } else {
+                }
+
+                if (result.symptom_guidance && result.symptom_guidance.length > 0) {
+                    hasRenderedContent = true;
+                    const isConsultOnly = !result.diseases || result.diseases.length === 0;
+                    const consultationNotice = isConsultOnly ? `
+                        <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid var(--accent-color); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: start; gap: 0.5rem;">
+                            <span style="font-size: 1.1rem; line-height: 1;">ℹ️</span>
+                            <div>
+                                <span style="font-weight: 600;">${uiLang.consultNoticeTitle}</span> ${uiLang.consultNoticeBody}
+                            </div>
+                        </div>
+                    ` : '';
+
+                    list.innerHTML += `
+                        <div style="margin-top: 0.5rem;">
+                            ${consultationNotice}
+                            <div style="font-weight: 700; color: var(--accent-color); font-size: 0.95rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <span>${uiLang.guidanceHeader}</span>
+                            </div>
+                            ${result.symptom_guidance.map((item, idx) => `
+                                <div class="disease-card" style="border-left: 3px solid var(--accent-color); background: rgba(99, 102, 241, 0.04); margin-bottom: 0.75rem;">
+                                    <div style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap;">${item}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                if (!hasRenderedContent) {
                     list.innerHTML = `
                         <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            No specific diseases identified.
+                            ${uiLang.noResults}
                         </div>
                     `;
                 }
@@ -1469,7 +1921,7 @@
                 // Reset loading state
                 submitBtn.disabled = false;
                 spinner.style.display = 'none';
-                btnText.innerText = 'Run AI Diagnosis';
+                btnText.innerText = currentTesterMode === 'text' ? 'Consult Symptom Guide (symptom.json)' : 'Run AI Disease Diagnosis';
             }
         }
 

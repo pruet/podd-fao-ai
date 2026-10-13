@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAO-PODD V.2 - Animal Disease Diagnosis AI</title>
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-hover: #0369a1;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-page: #f8fafc;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 30px 16px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 24px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 1.85rem;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .owner-box {
+            background: #f1f5f9;
+            border-left: 4px solid var(--primary);
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin-bottom: 32px;
+        }
+
+        .owner-box h3 {
+            font-size: 1rem;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+
+        .owner-box p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin: 2px 0;
+        }
+
+        h2 {
+            font-size: 1.35rem;
+            color: #0f172a;
+            margin-top: 28px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            margin-bottom: 14px;
+            color: #334155;
+            font-size: 1rem;
+        }
+
+        ul {
+            margin-left: 20px;
+            margin-bottom: 20px;
+            color: #334155;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .badge-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 14px 0 24px 0;
+        }
+
+        .badge {
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .links-section {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .links-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            color: #0f172a;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            color: var(--primary-hover);
+        }
+
+        footer {
+            margin-top: 36px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 24px 18px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>FAO-PODD V.2</h1>
+        <div class="tagline">AI-Powered Animal Disease Surveillance &amp; Diagnostics</div>
+    </header>
+
+    <!-- Project Leadership -->
+    <div class="owner-box">
+        <h3>Project Owner: Pruet Boonma</h3>
+        <p>Department of Computer Engineering, Faculty of Engineering, Chiang Mai University</p>
+        <p>Email: <a href="mailto:pruet.b@eng.cmu.ac.th">pruet.b@eng.cmu.ac.th</a></p>
+    </div>
+
+    <!-- About Section -->
+    <section>
+        <h2>About the Application</h2>
+        <p>
+            <strong>FAO-PODD V.2</strong> is an intelligent veterinary disease surveillance service developed to assist veterinarians, livestock officers, and community volunteers in rapid detection and response to reportable livestock diseases.
+        </p>
+        <p>
+            The system combines Google Gemini multimodal AI vision with strict disease whitelist guardrails, automatically verifying animal symptoms and synchronizing reports with the <strong>Lao Animal Health Information System (LAHIS)</strong> and <strong>PODD</strong> One Health platform.
+        </p>
+    </section>
+
+    <!-- Key Features -->
+    <section>
+        <h2>Key Capabilities</h2>
+        <ul>
+            <li><strong>Multimodal Image Analysis:</strong> Evaluates photos of sick animals or lesions alongside field descriptions to identify species and clinical signs.</li>
+            <li><strong>Strict Whitelist Guardrail:</strong> Constrained exclusively to official Priority Reportable Diseases, preventing false or unlisted diagnoses.</li>
+            <li><strong>Trilingual Support:</strong> Provides complete diagnostic outputs and veterinary reasoning in <strong>Lao (ພາສາລາວ)</strong>, <strong>Thai (ภาษาไทย)</strong>, and <strong>English</strong>.</li>
+            <li><strong>Outbreak Cluster Detection:</strong> Tracks incident history across villages to detect prolonged disease clusters (&gt;14 days) and alert authorities.</li>
+            <li><strong>Immediate Field Guidelines:</strong> Delivers actionable first-response recommendations for local farmers and veterinarians without requiring lab equipment.</li>
+            <li><strong>LAHIS / OHTK Integration:</strong> Bi-directional webhook synchronization, dynamic photo fetching, and automated expert review comments.</li>
+        </ul>
+    </section>
+
+    <!-- Supported Animals -->
+    <section>
+        <h2>Supported Livestock Species</h2>
+        <div class="badge-list">
+            <span class="badge">Chicken</span>
+            <span class="badge">Duck &amp; Goose</span>
+            <span class="badge">Pig (Swine)</span>
+            <span class="badge">Cattle &amp; Buffalo</span>
+            <span class="badge">Goat &amp; Sheep</span>
+            <span class="badge">Dog &amp; Cat</span>
+        </div>
+    </section>
+
+    <!-- Project Partners -->
+    <section>
+        <h2>Collaborating Organizations</h2>
+        <ul>
+            <li>Food and Agriculture Organization of the United Nations (FAO)</li>
+            <li>Chiang Mai University (CMU) &amp; VPHCAP</li>
+            <li>Department of Livestock and Fisheries (DLF), Lao PDR</li>
+            <li>Lao Animal Health Information System (LAHIS / OHTK)</li>
+            <li>Participatory One Health Disease Detection (PODD)</li>
+        </ul>
+    </section>
+
+    <!-- Useful Links -->
+    <div class="links-section">
+        <h3>Important Links</h3>
+        <ul>
+            <li><a href="privacy.html">Privacy Policy</a> (Google Play Store Compliant)</li>
+            <li><a href="https://podd-fao-ai.as.r.appspot.com">Web Dashboard (Protected)</a></li>
+            <li><a href="https://podd-fao-ai.as.r.appspot.com/docs">API Documentation (Swagger)</a></li>
+        </ul>
+    </div>
+
+    <footer>
+        &copy; 2026 FAO-PODD Project &bull; Project Owner: Pruet Boonma &bull; Chiang Mai University
+    </footer>
+</div>
+
+</body>
+</html>

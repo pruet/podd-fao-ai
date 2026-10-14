@@ -398,6 +398,75 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
 
     @patch("main.get_genai_client")
+    @patch("main.get_lahis_token", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_images", new_callable=AsyncMock)
+    @patch("main.submit_lahis_comment", new_callable=AsyncMock)
+    @patch("main.submit_lahis_cluster", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_incident_detail", new_callable=AsyncMock)
+    @patch.dict(os.environ, {
+        "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
+        "LAHIS_CLIENT_ID": "mock_client",
+        "LAHIS_CLIENT_SECRET": "mock_secret",
+        "LAHIS_SIGNING_SECRET": ""
+    })
+    def test_analyze_webhook_triggers_automatic_cluster(
+        self, mock_fetch_detail, mock_submit_cluster, mock_submit_comment,
+        mock_fetch_images, mock_get_token, mock_get_client
+    ):
+        mock_get_token.return_value = "mock_access_token"
+        mock_fetch_images.return_value = [b"mock image bytes"]
+        mock_submit_comment.return_value = {"status": "accepted"}
+        mock_submit_cluster.return_value = {"status": "accepted", "id": "cluster-auto-1"}
+        mock_fetch_detail.return_value = {
+            "incident": {
+                "id": "report-anthrax-001",
+                "incidentDate": "2026-08-15",
+                "village": {"id": 88, "name": "Ban Xai"}
+            }
+        }
+
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.usage_metadata = None
+        mock_response.text = json.dumps({
+            "is_valid_animal_image": True,
+            "invalid_reason": None,
+            "animal_type": "Cattle",
+            "diseases": [
+                {
+                    "name": "Anthrax",
+                    "confidence": 0.95,
+                    "reasoning": "Dark uncoagulated blood discharge observed."
+                }
+            ]
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+
+        payload = {
+            "schemaVersion": "2026-06-02",
+            "eventType": "report.submitted",
+            "eventId": "event-anthrax-1",
+            "producedAt": "2026-08-15T10:00:00Z",
+            "report": {
+                "id": "report-anthrax-001",
+                "incidentDate": "2026-08-15",
+                "reportType": {"id": "type-123", "name": "Animal Sick/Death"}
+            }
+        }
+
+        with patch("main.Image.open") as mock_image_open:
+            mock_image_open.return_value = MagicMock()
+            response = self.client.post("/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        mock_submit_comment.assert_called_once()
+        mock_submit_cluster.assert_called_once()
+        cluster_payload = mock_submit_cluster.call_args[0][0]
+        self.assertIn("Anthrax", cluster_payload["explanation"])
+        self.assertEqual(cluster_payload["riskLevel"], "HIGH")
+
+    @patch("main.get_genai_client")
     def test_image_logging_and_serving(self, mock_get_client):
         mock_genai_client = MagicMock()
         mock_response = MagicMock()

@@ -1072,6 +1072,7 @@ async def analyze_animal_image(
         api_url = os.getenv("TENANT_API_URL")
         client_id = os.getenv("LAHIS_CLIENT_ID")
         client_secret = os.getenv("LAHIS_CLIENT_SECRET")
+        token = None
         
         if images and not is_json:
             for img in images:
@@ -1354,7 +1355,8 @@ STRICT CONSTRAINTS:
                 highest_confidence = max(highest_confidence, d.get("confidence", 0.0))
             
             # Re-fetch or reuse token to call comments API
-            token = await get_lahis_token(client_id, client_secret, api_url)
+            if not token:
+                token = await get_lahis_token(client_id, client_secret, api_url)
             
             comments_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/comments"
             payload = {
@@ -1407,6 +1409,113 @@ STRICT CONSTRAINTS:
                     output_tokens=output_tokens
                 )
                 raise e
+
+        # Automated Priority Cluster Processing (Option A: Both /detect-cluster and post-/analyze)
+        config = load_config()
+        detected_priority_disease = None
+        for d in (result.get("diseases") or []):
+            if isinstance(d, dict) and d.get("name"):
+                is_trig, canonical = is_cluster_trigger_disease(d["name"], config)
+                if is_trig:
+                    detected_priority_disease = canonical
+                    break
+
+        if detected_priority_disease and report_id:
+            village_id = None
+            village_name = None
+            incident_loc = None
+            incident_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+            if is_json:
+                report_data = body.get("report") or {}
+                if report_data.get("incidentDate"):
+                    incident_date = report_data.get("incidentDate")
+
+            # Try to fetch fuller incident detail if token & api_url are available
+            if all([api_url, client_id, client_secret]):
+                try:
+                    if not token:
+                        token = await get_lahis_token(client_id, client_secret, api_url)
+                    inc_detail = await fetch_lahis_incident_detail(report_id, token, api_url)
+                    inc_obj = inc_detail.get("incident") or inc_detail
+                    v_info = inc_obj.get("village") or {}
+                    village_id = v_info.get("id") or inc_obj.get("villageId") or inc_obj.get("village_id")
+                    village_name = v_info.get("name") or inc_obj.get("villageName") or inc_obj.get("village_name")
+                    incident_loc = inc_obj.get("location")
+                    if inc_obj.get("incidentDate"):
+                        incident_date = inc_obj.get("incidentDate")
+                    if not village_id:
+                        rel_auth = inc_obj.get("relevantAuthorityIds") or []
+                        if rel_auth:
+                            village_id = f"auth-{rel_auth[0]}"
+                        elif incident_loc:
+                            village_id = f"loc-{incident_loc.get('lat')},{incident_loc.get('lon')}"
+                except Exception as e:
+                    print(f"Error fetching incident detail for automated cluster creation: {e}")
+
+            if not village_id:
+                if is_json:
+                    rel_auth = (body.get("report") or {}).get("relevantAuthorityIds") or []
+                    village_id = f"auth-{rel_auth[0]}" if rel_auth else "default_village"
+                else:
+                    village_id = "default_village"
+
+            # 1. Record cluster report in DB with detected disease
+            record_cluster_report(
+                report_id=str(report_id),
+                village_id=str(village_id),
+                village_name=village_name,
+                date_str=incident_date,
+                raw_payload=json.dumps(request_params),
+                detected_disease=detected_priority_disease
+            )
+
+            # 2. Automatically submit cluster to LAHIS if incoming webhook
+            if is_json and all([api_url, client_id, client_secret]) and token:
+                all_village_reports = get_village_all_reports(str(village_id))
+                all_incident_ids = list(set([r["report_id"] for r in all_village_reports if r.get("report_id")]))
+                if report_id not in all_incident_ids:
+                    all_incident_ids.append(report_id)
+
+                village_id_int = int(village_id) if str(village_id).isdigit() else None
+                authority_ids = (body.get("report") or {}).get("relevantAuthorityIds") if is_json else []
+
+                cluster_payload = {
+                    "externalClusterId": f"cluster-{village_id}-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
+                    "algorithmVersion": "podd-cluster-detector-v2",
+                    "window": {
+                        "from": incident_date,
+                        "to": incident_date
+                    },
+                    "incidentIds": all_incident_ids,
+                    "authorityIds": authority_ids or [],
+                    "villageIds": [village_id_int] if village_id_int is not None else [],
+                    "geometry": incident_loc,
+                    "radiusMeters": 500.0,
+                    "score": 1.0,
+                    "riskLevel": "HIGH",
+                    "explanation": f"Cluster detected: Priority reportable disease '{detected_priority_disease}' detected by AI in village {village_name or village_id}.",
+                    "metadata": {
+                        "source": "fao-podd-ai-analyzer",
+                        "detected_disease": detected_priority_disease,
+                        "report_count": len(all_incident_ids)
+                    }
+                }
+                try:
+                    cluster_sub_resp = await submit_lahis_cluster(cluster_payload, token, api_url)
+                    steps["step_6"] = {
+                        "title": "6. Automated Priority Cluster Submission to LAHIS",
+                        "data": {
+                            "payload": cluster_payload,
+                            "response": cluster_sub_resp
+                        }
+                    }
+                except Exception as e:
+                    print(f"Failed to auto-submit priority cluster to LAHIS in /analyze: {e}")
+                    steps["step_6"] = {
+                        "title": "6. Automated Priority Cluster Submission to LAHIS (Error)",
+                        "data": {"error": str(e)}
+                    }
         
         # Log success
         latency = time.time() - start_time

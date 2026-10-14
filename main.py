@@ -2,12 +2,12 @@ import os
 import io
 import hmac
 import hashlib
-from typing import Optional
+import re
+from typing import Optional, List, Tuple
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends, status
 from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
-from typing import List
 from google import genai
 from google.genai import types
 from PIL import Image
@@ -145,7 +145,8 @@ def init_db():
                 report_id TEXT,
                 village_id TEXT,
                 village_name TEXT,
-                raw_payload TEXT
+                raw_payload TEXT,
+                detected_disease TEXT
             )
         """)
         # Run migrations if columns are missing
@@ -157,6 +158,12 @@ def init_db():
             cursor.execute("ALTER TABLE api_logs ADD COLUMN prompt_tokens INTEGER DEFAULT 0")
         if "output_tokens" not in columns:
             cursor.execute("ALTER TABLE api_logs ADD COLUMN output_tokens INTEGER DEFAULT 0")
+
+        cursor.execute("PRAGMA table_info(cluster_reports)")
+        cluster_columns = [row[1] for row in cursor.fetchall()]
+        if "detected_disease" not in cluster_columns:
+            cursor.execute("ALTER TABLE cluster_reports ADD COLUMN detected_disease TEXT")
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -165,7 +172,14 @@ def init_db():
 # Initialize DB on load
 init_db()
 
-def record_cluster_report(report_id: str, village_id: str, village_name: Optional[str], date_str: str, raw_payload: str):
+def record_cluster_report(
+    report_id: str,
+    village_id: str,
+    village_name: Optional[str],
+    date_str: str,
+    raw_payload: str,
+    detected_disease: Optional[str] = None
+):
     timestamp = datetime.now(timezone.utc).isoformat()
     if USE_DATASTORE and datastore_client:
         try:
@@ -177,7 +191,8 @@ def record_cluster_report(report_id: str, village_id: str, village_name: Optiona
                 "report_id": str(report_id),
                 "village_id": str(village_id),
                 "village_name": str(village_name or ""),
-                "raw_payload": raw_payload
+                "raw_payload": raw_payload,
+                "detected_disease": str(detected_disease or "")
             })
             datastore_client.put(entity)
             return
@@ -188,9 +203,9 @@ def record_cluster_report(report_id: str, village_id: str, village_name: Optiona
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO cluster_reports (timestamp, date_str, report_id, village_id, village_name, raw_payload)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (timestamp, str(date_str), str(report_id), str(village_id), str(village_name or ""), raw_payload))
+            INSERT INTO cluster_reports (timestamp, date_str, report_id, village_id, village_name, raw_payload, detected_disease)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (timestamp, str(date_str), str(report_id), str(village_id), str(village_name or ""), raw_payload, str(detected_disease or "")))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -211,7 +226,8 @@ def get_village_reports_for_date(village_id: str, date_str: str) -> List[dict]:
                     "report_id": entity.get("report_id"),
                     "village_id": entity.get("village_id"),
                     "village_name": entity.get("village_name"),
-                    "raw_payload": entity.get("raw_payload")
+                    "raw_payload": entity.get("raw_payload"),
+                    "detected_disease": entity.get("detected_disease", "")
                 }
                 for entity in results
             ]
@@ -236,7 +252,8 @@ def get_village_reports_for_date(village_id: str, date_str: str) -> List[dict]:
                 "report_id": row["report_id"],
                 "village_id": row["village_id"],
                 "village_name": row["village_name"],
-                "raw_payload": row["raw_payload"]
+                "raw_payload": row["raw_payload"],
+                "detected_disease": row["detected_disease"] if "detected_disease" in row.keys() else ""
             }
             for row in rows
         ]
@@ -258,7 +275,8 @@ def get_village_all_reports(village_id: str) -> List[dict]:
                     "report_id": entity.get("report_id"),
                     "village_id": entity.get("village_id"),
                     "village_name": entity.get("village_name"),
-                    "raw_payload": entity.get("raw_payload")
+                    "raw_payload": entity.get("raw_payload"),
+                    "detected_disease": entity.get("detected_disease", "")
                 }
                 for entity in results
             ]
@@ -283,13 +301,142 @@ def get_village_all_reports(village_id: str) -> List[dict]:
                 "report_id": row["report_id"],
                 "village_id": row["village_id"],
                 "village_name": row["village_name"],
-                "raw_payload": row["raw_payload"]
+                "raw_payload": row["raw_payload"],
+                "detected_disease": row["detected_disease"] if "detected_disease" in row.keys() else ""
             }
             for row in rows
         ]
     except Exception as e:
         print(f"Error querying cluster reports from DB: {e}")
         return []
+
+def get_ai_diagnosed_diseases_for_report(report_id: str) -> List[str]:
+    if not report_id:
+        return []
+    diseases_found = []
+
+    if USE_DATASTORE and datastore_client:
+        try:
+            query = datastore_client.query(kind="ApiLog")
+            query.add_filter("path", "=", "/analyze")
+            query.order = ["-timestamp"]
+            results = list(query.fetch(limit=100))
+            for entity in results:
+                raw_params = entity.get("request_params") or ""
+                if report_id in str(raw_params):
+                    resp_body = entity.get("response_body") or ""
+                    try:
+                        parsed = json.loads(resp_body)
+                        for d in (parsed.get("diseases") or []):
+                            if isinstance(d, dict) and d.get("name"):
+                                diseases_found.append(d["name"])
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"Error fetching AI diagnosed diseases from Datastore: {e}")
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT response_body FROM api_logs WHERE path = '/analyze' AND request_params LIKE ? ORDER BY id DESC LIMIT 10",
+            (f"%{report_id}%",)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        for row in rows:
+            resp_body = row["response_body"]
+            if resp_body:
+                try:
+                    parsed = json.loads(resp_body)
+                    for d in (parsed.get("diseases") or []):
+                        if isinstance(d, dict) and d.get("name"):
+                            diseases_found.append(d["name"])
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Error fetching AI diagnosed diseases from SQLite: {e}")
+
+    return list(dict.fromkeys(diseases_found))
+
+def is_cluster_trigger_disease(disease_name: Optional[str], config: Optional[dict] = None) -> Tuple[bool, Optional[str]]:
+    if not disease_name:
+        return False, None
+
+    if config is None:
+        config = load_config()
+
+    trigger_list = config.get("cluster_trigger_diseases", [
+        "Foot-and-mouth disease (FMD)",
+        "African swine fever (ASF)",
+        "Highly pathogenic avian influenza (HPAI)",
+        "Newcastle disease",
+        "Rabies",
+        "Anthrax",
+        "Lumpy skin disease (LSD)"
+    ])
+
+    name_clean = disease_name.strip().lower()
+
+    aliases = {
+        "Foot-and-mouth disease (FMD)": [
+            "foot-and-mouth disease", "foot and mouth disease", "foot and mouth",
+            "foot-and-mouth", "fmd", "ปากและเท้าเปื่อย", "โรคปากและเท้าเปื่อย",
+            "ປາກ ແລະ ເລັບເປື່ອຍ", "ພະຍາດປາກ ແລະ ເລັບເປື່ອຍ", "ປາກເປື່ອຍເລັບເປື່ອຍ"
+        ],
+        "African swine fever (ASF)": [
+            "african swine fever", "asf", "อหิวาต์แอฟริกา", "อหิวาต์แอฟริกาในสุกร",
+            "โรคอหิวาต์แอฟริกาในสุกร", "ອະຫິວາໝູອາຟຣິກາ", "ພະຍາດອະຫິວາໝູອາຟຣິກາ"
+        ],
+        "Highly pathogenic avian influenza (HPAI)": [
+            "highly pathogenic avian influenza", "avian influenza", "hpai",
+            "bird flu", "avian flu", "ไข้หวัดนก", "โรคไข้หวัดนก",
+            "ໄຂ້ຫວັດສັດປີກ", "ພະຍາດໄຂ້ຫວັດສັດປີກ"
+        ],
+        "Newcastle disease": [
+            "newcastle disease", "newcastle", "nd", "ห่าไก่", "โรคห่าไก่",
+            "นิวคาสเซิล", "โรคนิวคาสเซิล", "ຫ່າໄກ່", "ພະຍາດຫ່າໄກ່",
+            "ນິວຄາສເຊິລ", "ພະຍາດນິວຄາສເຊິລ"
+        ],
+        "Rabies": [
+            "rabies", "พิษสุนัขบ้า", "โรคพิษสุนัขบ้า", "โรคกลัวน้ำ",
+            "ວໍ້", "ພະຍາດວໍ້"
+        ],
+        "Anthrax": [
+            "anthrax", "แอนแทรกซ์", "โรคแอนแทรกซ์", "กาลี",
+            "ແອນແທຣກ", "ພະຍາດແອນແທຣກ"
+        ],
+        "Lumpy skin disease (LSD)": [
+            "lumpy skin disease", "lumpy skin", "lsd", "ลัมปี สกิน", "ลัมปีสกิน",
+            "โรคลัมปี สกิน", "ລຳປີສະກິນ", "ຜິວໜັງອັກເສບຕິດຕໍ່",
+            "ພະຍາດຜິວໜັງອັກເສບຕິດຕໍ່ (lumpy skin)"
+        ]
+    }
+
+    # 1. Match against configured trigger list using known aliases and direct names
+    for trigger in trigger_list:
+        trigger_lower = trigger.strip().lower()
+        if trigger_lower in name_clean or name_clean in trigger_lower:
+            return True, trigger
+
+        for canonical, alias_keywords in aliases.items():
+            if canonical.lower() == trigger_lower or trigger_lower in canonical.lower():
+                for kw in alias_keywords:
+                    if kw in name_clean:
+                        return True, trigger
+
+    # 2. General fallback token match
+    for trigger in trigger_list:
+        t_tokens = set(re.findall(r"\w+", trigger.lower()))
+        n_tokens = set(re.findall(r"\w+", name_clean))
+        stopwords = {"disease", "of", "and", "in", "the", "โรค", "ພະຍາດ"}
+        t_sig = t_tokens - stopwords
+        n_sig = n_tokens - stopwords
+        if t_sig and n_sig and t_sig.issubset(n_sig):
+            return True, trigger
+
+    return False, None
 
 
 security = HTTPBasic()
@@ -418,13 +565,22 @@ def load_config():
     return {
         "guardrail_policy": "Determine if the request involves an animal belonging to the ALLOWED animal species list:\n{allowed_animals}\n\nValidation Rules:\n1. For image-based diagnosis: Determine if the image depicts a living animal, animal carcass, or animal body parts (such as skin, mouth, organs, legs, etc.) of an allowed animal species. If the image does NOT contain any animal, carcass, or animal body part (e.g., contains only people, vehicles, buildings, landscapes, electronic devices, food, or general household items), you MUST set `is_valid_animal_image` to False and explain why in `invalid_reason` in {lang_name} language.\n2. For animal species validation (both image analysis and text-only symptom consultations): If the animal species is NOT in the allowed list above (such as horse, snake, elephant, monkey, wild bird, fish, etc.), you MUST set `is_valid_animal_image` to False and set `invalid_reason` to 'This is not an acceptable animal, we don't process [animal name]' translated into {lang_name} language (e.g., in Lao: 'ນີ້ບໍ່ແມ່ນສັດທີ່ຮອງຮັບ, ພວກເຮົາບໍ່ໄດ້ປະມວນຜົນ [animal name]', in Thai: 'นี่ไม่ใช่สัตว์ที่รองรับ เราไม่ประมวลผล [animal name]').\n3. If and only if it is a valid animal of an allowed species, set `is_valid_animal_image` to True.\n\nSTRICT DISEASE WHITELIST GUARDRAIL (Image-Based Diagnosis):\n- ONLY diseases that appear on the allowed Priority Reportable Diseases list for the identified animal species may be considered or suggested.\n- If the observed condition, symptoms, or suspected disease does NOT match any disease on the official allowed list, or if the detected disease is outside the allowed list, you MUST NOT provide any disease response (you MUST set `diseases` to an empty list `[]`). Under NO circumstances should you name or suggest any unlisted disease.\n\nSTRICT SYMPTOM-ONLY CONSULTATION GUARDRAIL (Text-Only Requests Without Images):\n- When analyzing clinical descriptions without images, DO NOT diagnose, name, suspect, or identify any specific disease under any circumstances.\n- Focus strictly on matching observed signs against the official reference symptoms handbook and providing condition management guidance.",
         "prompt_template": "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. Evaluate symptoms ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the symptoms, list up to three with a confidence level (0.0 to 1.0), brief reasoning/symptoms observed, and basic response recommendations for local veterinarians without requiring laboratory testing in {lang_name} language.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, basic_response, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}",
-        "text_symptom_prompt_template": "You are an expert veterinary clinical symptom analyzer.\nThe user provided a clinical description of a sick animal without any image.\nAnimal Species: {animal_type} (Normalized: {norm_animal})\nDescription of observed signs and symptoms:\n{description}\n\nHere is the official reference list of 46 clinical symptoms:\n{symptoms_list_str}\n\nTasks:\n1. Identify which symptoms from the official reference list match the observed signs described in the text description.\n   Return their symptom numbers in `matched_symptom_numbers` (an empty list if none match).\n2. In `symptom_analysis`, provide a clear, supportive clinical assessment of the reported symptoms in {lang_name} language.\n3. For each matched symptom, look up its standard veterinary field handbook guidance and provide it in `symptom_guidance_entries` translated and written entirely in {lang_name} language.\n   Format each entry as: [Symptom Name in {lang_name}] Specific handbook guidance and practical field care steps in {lang_name} language.\n\nSTRICT CONSTRAINTS:\n- DO NOT name, diagnose, suspect, or identify any specific disease under any circumstances (e.g., do NOT mention FMD, Anthrax, Swine Fever, Rabies, etc.).\n- Focus strictly on the symptoms, clinical signs, and condition management.\n- All entries in `symptom_analysis` and `symptom_guidance_entries` MUST be written in {lang_name} language.\n- Return your response strictly matching the schema."
+        "text_symptom_prompt_template": "You are an expert veterinary clinical symptom analyzer.\nThe user provided a clinical description of a sick animal without any image.\nAnimal Species: {animal_type} (Normalized: {norm_animal})\nDescription of observed signs and symptoms:\n{description}\n\nHere is the official reference list of 46 clinical symptoms:\n{symptoms_list_str}\n\nTasks:\n1. Identify which symptoms from the official reference list match the observed signs described in the text description.\n   Return their symptom numbers in `matched_symptom_numbers` (an empty list if none match).\n2. In `symptom_analysis`, provide a clear, supportive clinical assessment of the reported symptoms in {lang_name} language.\n3. For each matched symptom, look up its standard veterinary field handbook guidance and provide it in `symptom_guidance_entries` translated and written entirely in {lang_name} language.\n   Format each entry as: [Symptom Name in {lang_name}] Specific handbook guidance and practical field care steps in {lang_name} language.\n\nSTRICT CONSTRAINTS:\n- DO NOT name, diagnose, suspect, or identify any specific disease under any circumstances (e.g., do NOT mention FMD, Anthrax, Swine Fever, Rabies, etc.).\n- Focus strictly on the symptoms, clinical signs, and condition management.\n- All entries in `symptom_analysis` and `symptom_guidance_entries` MUST be written in {lang_name} language.\n- Return your response strictly matching the schema.",
+        "cluster_trigger_diseases": [
+            "Foot-and-mouth disease (FMD)",
+            "African swine fever (ASF)",
+            "Highly pathogenic avian influenza (HPAI)",
+            "Newcastle disease",
+            "Rabies",
+            "Anthrax",
+            "Lumpy skin disease (LSD)"
+        ]
     }
 
 app = FastAPI(
     title="FAO-PODD Animal Disease Diagnosis API",
     description="Analyze animal images and descriptions to identify potential diseases.",
-    version="2.6.3"
+    version="2.7.0"
 )
 
 # Initialize GenAI Client
@@ -1407,20 +1563,94 @@ async def detect_cluster(
                 village_id = "default_village"
                 
         incident_date = incident.get("incidentDate") or datetime.utcnow().strftime("%Y-%m-%d")
-        
-        # Record this incoming request to DB
+
+        # Load config to get trigger diseases list
+        config = load_config()
+
+        # Step A: Collect candidate diseases from all available sources
+        candidate_diseases = []
+
+        # 1. Direct from request params / form
+        for k in ["disease", "detected_disease", "disease_name"]:
+            val = request_params.get(k)
+            if val and isinstance(val, str):
+                candidate_diseases.append(val)
+
+        # 2. From incident details (LAHIS)
+        for k in ["disease", "detected_disease", "diseaseName"]:
+            val = incident.get(k)
+            if val and isinstance(val, str):
+                candidate_diseases.append(val)
+        if incident.get("diseases") and isinstance(incident.get("diseases"), list):
+            for d in incident["diseases"]:
+                if isinstance(d, str):
+                    candidate_diseases.append(d)
+                elif isinstance(d, dict) and d.get("name"):
+                    candidate_diseases.append(d["name"])
+
+        # 3. From AI diagnosis logs in DB for this report_id
+        ai_logged_diseases = get_ai_diagnosed_diseases_for_report(str(report_id))
+        candidate_diseases.extend(ai_logged_diseases)
+
+        # 4. If images provided with detect-cluster or in LAHIS and no candidate disease found yet
+        if not candidate_diseases:
+            multiple_images_bytes = []
+            if images:
+                for img in images:
+                    try:
+                        d = await img.read()
+                        if d:
+                            multiple_images_bytes.append(d)
+                    except Exception:
+                        pass
+            elif all([api_url, client_id, client_secret]) and report_id:
+                try:
+                    multiple_images_bytes = await fetch_lahis_report_images(report_id, token, api_url)
+                except Exception as e:
+                    print(f"Could not fetch LAHIS images for cluster detection: {e}")
+
+            if multiple_images_bytes:
+                try:
+                    genai_client = get_genai_client()
+                    pil_imgs = [Image.open(io.BytesIO(b)) for b in multiple_images_bytes]
+                    ai_resp = genai_client.models.generate_content(
+                        model='gemini-3.5-flash',
+                        contents=pil_imgs + ["Identify animal species and any symptoms or diseases matching the priority reportable diseases list."],
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=DiagnosisResponse,
+                            temperature=0.2,
+                        ),
+                    )
+                    parsed_ai = json.loads(ai_resp.text)
+                    for d in (parsed_ai.get("diseases") or []):
+                        if isinstance(d, dict) and d.get("name"):
+                            candidate_diseases.append(d["name"])
+                except Exception as e:
+                    print(f"Error running on-demand AI analysis in cluster detector: {e}")
+
+        # Check candidate diseases against priority trigger list
+        matched_trigger_disease = None
+        for cd in candidate_diseases:
+            is_trig, trig_canonical = is_cluster_trigger_disease(cd, config)
+            if is_trig:
+                matched_trigger_disease = trig_canonical
+                break
+
+        # Record this incoming request to DB with detected disease
         record_cluster_report(
             report_id=report_id,
             village_id=str(village_id),
             village_name=village_name,
             date_str=incident_date,
-            raw_payload=json.dumps(request_params)
+            raw_payload=json.dumps(request_params),
+            detected_disease=matched_trigger_disease or (candidate_diseases[0] if candidate_diseases else "")
         )
-        
+
         # Check all reports for this village across history
         all_village_reports = get_village_all_reports(str(village_id))
         report_count = len(all_village_reports)
-        
+
         # Calculate timeline span for this village
         report_dates = []
         for r in all_village_reports:
@@ -1431,7 +1661,7 @@ async def detect_cluster(
                     report_dates.append(dt)
                 except Exception:
                     pass
-                    
+
         if report_dates:
             earliest_date = min(report_dates)
             latest_date = max(report_dates)
@@ -1440,12 +1670,22 @@ async def detect_cluster(
             earliest_date = datetime.utcnow()
             latest_date = datetime.utcnow()
             span_days = 0
-            
-        cluster_detected = span_days > 14
+
+        # If not matched on current report, check if any prior report in village had a trigger disease
+        if not matched_trigger_disease:
+            for r in all_village_reports:
+                r_dis = r.get("detected_disease")
+                if r_dis:
+                    is_trig, trig_canonical = is_cluster_trigger_disease(r_dis, config)
+                    if is_trig:
+                        matched_trigger_disease = trig_canonical
+                        break
+
+        cluster_detected = bool(matched_trigger_disease)
         cluster_response = None
-        
+
         steps["step_3"] = {
-            "title": "3. Timeline Cluster Check",
+            "title": "3. Priority Disease Cluster Check",
             "data": {
                 "village_id": str(village_id),
                 "village_name": village_name,
@@ -1453,19 +1693,21 @@ async def detect_cluster(
                 "latest_date": latest_date.strftime("%Y-%m-%d"),
                 "span_days": span_days,
                 "report_count": report_count,
-                "cluster_detected": cluster_detected
+                "detected_disease": matched_trigger_disease,
+                "cluster_detected": cluster_detected,
+                "trigger_diseases": config.get("cluster_trigger_diseases", [])
             }
         }
-        
+
         if cluster_detected:
             # Collect unique incident IDs in this village
             all_incident_ids = list(set([r["report_id"] for r in all_village_reports if r.get("report_id")]))
             if report_id not in all_incident_ids:
                 all_incident_ids.append(report_id)
-                
+
             village_id_int = int(village_id) if str(village_id).isdigit() else None
             authority_ids = incident.get("relevantAuthorityIds") or []
-            
+
             cluster_payload = {
                 "externalClusterId": f"cluster-{village_id}-{earliest_date.strftime('%Y%m%d')}-{latest_date.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
                 "algorithmVersion": "podd-cluster-detector-v2",
@@ -1480,19 +1722,20 @@ async def detect_cluster(
                 "radiusMeters": 500.0,
                 "score": 1.0,
                 "riskLevel": "HIGH",
-                "explanation": f"Cluster detected: Suspected disease reports in village {village_name or village_id} continued for {span_days} days (>14 days).",
+                "explanation": f"Cluster detected: Priority reportable disease '{matched_trigger_disease}' detected by AI in village {village_name or village_id}.",
                 "metadata": {
                     "source": "fao-podd-cluster-detector",
+                    "detected_disease": matched_trigger_disease,
                     "span_days": span_days,
                     "report_count": report_count
                 }
             }
-            
+
             steps["step_4"] = {
                 "title": "4. Sending Cluster to LAHIS Callback",
                 "data": cluster_payload
             }
-            
+
             try:
                 cluster_response = await submit_lahis_cluster(cluster_payload, token, api_url)
                 steps["step_5"] = {
@@ -1508,6 +1751,7 @@ async def detect_cluster(
         result = {
             "status": "success",
             "cluster_detected": cluster_detected,
+            "detected_disease": matched_trigger_disease,
             "report_count": report_count,
             "village_id": str(village_id),
             "village_name": village_name,
@@ -1780,7 +2024,8 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
                     "report_id": entity.get("report_id"),
                     "village_id": entity.get("village_id"),
                     "village_name": entity.get("village_name"),
-                    "raw_payload": entity.get("raw_payload")
+                    "raw_payload": entity.get("raw_payload"),
+                    "detected_disease": entity.get("detected_disease", "")
                 })
         except Exception as e:
             print(f"Datastore fetch cluster reports error: {e}")
@@ -1801,7 +2046,8 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
                     "report_id": row["report_id"],
                     "village_id": row["village_id"],
                     "village_name": row["village_name"],
-                    "raw_payload": row["raw_payload"]
+                    "raw_payload": row["raw_payload"],
+                    "detected_disease": row["detected_disease"] if "detected_disease" in row.keys() else ""
                 })
         except Exception as e:
             print(f"SQLite fetch cluster reports error: {e}")
@@ -1816,11 +2062,15 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
                 "village_name": r["village_name"] or "Unknown Village",
                 "reports": [],
                 "dates": [],
+                "detected_diseases": [],
                 "latest_timestamp": r["timestamp"]
             }
         if r["report_id"] and r["report_id"] not in groups[vid]["reports"]:
             groups[vid]["reports"].append(r["report_id"])
-        
+
+        if r.get("detected_disease") and r["detected_disease"] not in groups[vid]["detected_diseases"]:
+            groups[vid]["detected_diseases"].append(r["detected_disease"])
+
         d_str = r.get("date_str")
         if d_str:
             try:
@@ -1829,6 +2079,7 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
             except Exception:
                 pass
 
+    config = load_config()
     grouped_list = []
     total_clusters = 0
 
@@ -1844,7 +2095,14 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
             start_date_str = "N/A"
             latest_date_str = "N/A"
 
-        is_cluster = span_days > 14
+        matched_diseases = []
+        for dis in g.get("detected_diseases", []):
+            if dis:
+                is_trig, canonical = is_cluster_trigger_disease(dis, config)
+                if is_trig and canonical not in matched_diseases:
+                    matched_diseases.append(canonical)
+
+        is_cluster = len(matched_diseases) > 0
         if is_cluster:
             total_clusters += 1
 
@@ -1857,6 +2115,7 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
             "report_count": len(g["reports"]),
             "reports": g["reports"],
             "cluster_detected": is_cluster,
+            "trigger_disease": ", ".join(matched_diseases) if matched_diseases else None,
             "latest_timestamp": g["latest_timestamp"]
         })
 

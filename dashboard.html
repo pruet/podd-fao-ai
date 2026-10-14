@@ -790,7 +790,7 @@
                 <div class="logo-icon">F</div>
                 <div class="logo-title">
                     <h1>FAO-PODD Diagnostics</h1>
-                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.6.3</span></p>
+                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.7.0</span></p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
@@ -908,7 +908,7 @@
                     <div class="stat-value" id="stat-cluster-villages">0</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Clusters Detected (>2 Weeks Duration)</div>
+                    <div class="stat-label">Priority Disease Clusters</div>
                     <div class="stat-value" id="stat-cluster-active" style="background: linear-gradient(135deg, #f87171 0%, #ef4444 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">0</div>
                 </div>
             </div>
@@ -1509,9 +1509,10 @@
 
             tbody.innerHTML = clusters.map(c => {
                 const isCluster = c.cluster_detected;
+                const diseaseBadge = c.trigger_disease ? ` (${c.trigger_disease})` : '';
                 const statusBadge = isCluster
-                    ? '<span class="result-badge invalid" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.8rem; font-weight: 700; padding: 4px 10px;">🚨 CLUSTER DETECTED (>2 Weeks)</span>'
-                    : '<span class="result-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.8rem; font-weight: 600; padding: 4px 10px;">Monitoring (<=14 Days)</span>';
+                    ? `<span class="result-badge invalid" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.8rem; font-weight: 700; padding: 4px 10px;">🚨 CLUSTER DETECTED${diseaseBadge}</span>`
+                    : '<span class="result-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 0.8rem; font-weight: 600; padding: 4px 10px;">Monitoring (No Priority Disease)</span>';
 
                 const reportIdsStr = (c.reports && c.reports.length > 0) ? c.reports.join(', ') : 'None';
                 const spanDaysStr = (c.span_days !== undefined) ? `${c.span_days} days` : '0 days';

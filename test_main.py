@@ -517,43 +517,80 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         "LAHIS_CLIENT_ID": "mock_client",
         "LAHIS_CLIENT_SECRET": "mock_secret"
     })
-    def test_detect_cluster_threshold_and_callback(self, mock_get_token, mock_fetch_detail, mock_submit_cluster):
+    def test_detect_cluster_priority_disease_and_callback(self, mock_get_token, mock_fetch_detail, mock_submit_cluster):
         mock_get_token.return_value = "mock_token"
         mock_submit_cluster.return_value = {"status": "accepted", "id": "cluster-111"}
 
-        # Simulate reports spanning > 14 days for village 99
-        # Report 1: Day 1 (2026-08-01)
-        # Report 2: Day 10 (2026-08-10) -> span 9 days (<= 14 days)
-        # Report 3: Day 17 (2026-08-17) -> span 16 days (> 14 days)
+        # Simulate reports:
+        # Report 1: No priority disease (e.g. Fowl Cholera or non-trigger) -> cluster_detected = False
+        # Report 2: Priority disease detected: Anthrax -> cluster_detected = True immediately
+        # Report 3: Priority disease detected: Foot-and-mouth disease (FMD) -> cluster_detected = True
         mock_fetch_detail.side_effect = [
-            {"incident": {"id": "rep-001", "incidentDate": "2026-08-01", "village": {"id": 99, "name": "Ban Na"}}},
-            {"incident": {"id": "rep-002", "incidentDate": "2026-08-10", "village": {"id": 99, "name": "Ban Na"}}},
-            {"incident": {"id": "rep-003", "incidentDate": "2026-08-17", "village": {"id": 99, "name": "Ban Na"}}}
+            {"incident": {"id": "rep-001", "incidentDate": "2026-08-01", "village": {"id": 99, "name": "Ban Na"}, "disease": "Fowl Cholera"}},
+            {"incident": {"id": "rep-002", "incidentDate": "2026-08-02", "village": {"id": 99, "name": "Ban Na"}, "disease": "Anthrax"}},
+            {"incident": {"id": "rep-003", "incidentDate": "2026-08-03", "village": {"id": 102, "name": "Ban Dong"}, "disease": "Foot and Mouth Disease (FMD)"}}
         ]
 
-        # 1st request -> span 0 days, cluster_detected = False
+        # 1st request -> Non-priority disease, cluster_detected = False
         res1 = self.client.post("/detect-cluster", data={"report_id": "rep-001"})
         self.assertEqual(res1.status_code, 200)
         data1 = res1.json()
         self.assertFalse(data1["cluster_detected"])
-        self.assertEqual(data1["span_days"], 0)
         mock_submit_cluster.assert_not_called()
 
-        # 2nd request -> span 9 days, cluster_detected = False
+        # 2nd request -> Anthrax detected -> cluster_detected = True (LAHIS callback called)
         res2 = self.client.post("/detect-cluster", data={"report_id": "rep-002"})
         self.assertEqual(res2.status_code, 200)
         data2 = res2.json()
-        self.assertFalse(data2["cluster_detected"])
-        self.assertEqual(data2["span_days"], 9)
-        mock_submit_cluster.assert_not_called()
+        self.assertTrue(data2["cluster_detected"])
+        self.assertEqual(data2["detected_disease"], "Anthrax")
+        mock_submit_cluster.assert_called_once()
 
-        # 3rd request -> span 16 days, cluster_detected = True (> 14 days)
+        # 3rd request -> New village, FMD detected -> cluster_detected = True (immediate cluster)
         res3 = self.client.post("/detect-cluster", data={"report_id": "rep-003"})
         self.assertEqual(res3.status_code, 200)
         data3 = res3.json()
         self.assertTrue(data3["cluster_detected"])
-        self.assertEqual(data3["span_days"], 16)
-        mock_submit_cluster.assert_called_once()
+        self.assertEqual(data3["detected_disease"], "Foot-and-mouth disease (FMD)")
+        self.assertEqual(mock_submit_cluster.call_count, 2)
+
+    def test_is_cluster_trigger_disease_matching(self):
+        from main import is_cluster_trigger_disease
+        # Test all 7 trigger diseases by full name and alias
+        triggers = [
+            ("Foot-and-mouth disease (FMD)", "Foot-and-mouth disease (FMD)"),
+            ("Foot and Mouth Disease", "Foot-and-mouth disease (FMD)"),
+            ("FMD", "Foot-and-mouth disease (FMD)"),
+            ("โรคปากและเท้าเปื่อย", "Foot-and-mouth disease (FMD)"),
+            ("ພະຍາດປາກ ແລະ ເລັບເປື່ອຍ", "Foot-and-mouth disease (FMD)"),
+            ("African swine fever (ASF)", "African swine fever (ASF)"),
+            ("African Swine Fever", "African swine fever (ASF)"),
+            ("ASF", "African swine fever (ASF)"),
+            ("Highly pathogenic avian influenza (HPAI)", "Highly pathogenic avian influenza (HPAI)"),
+            ("Avian influenza", "Highly pathogenic avian influenza (HPAI)"),
+            ("HPAI", "Highly pathogenic avian influenza (HPAI)"),
+            ("ไข้หวัดนก", "Highly pathogenic avian influenza (HPAI)"),
+            ("Newcastle disease", "Newcastle disease"),
+            ("โรคห่าไก่", "Newcastle disease"),
+            ("Rabies", "Rabies"),
+            ("โรคพิษสุนัขบ้า", "Rabies"),
+            ("Anthrax", "Anthrax"),
+            ("ແອນແທຣກ", "Anthrax"),
+            ("Lumpy skin disease (LSD)", "Lumpy skin disease (LSD)"),
+            ("Lumpy Skin Disease", "Lumpy skin disease (LSD)"),
+            ("LSD", "Lumpy skin disease (LSD)")
+        ]
+        for query, expected_canonical in triggers:
+            is_trig, canonical = is_cluster_trigger_disease(query)
+            self.assertTrue(is_trig, f"Failed matching for {query}")
+            self.assertEqual(canonical, expected_canonical, f"Mismatch for {query}: got {canonical}")
+
+        # Non-trigger diseases
+        non_triggers = ["Fowl Cholera", "Canine Parvovirus", "Infectious Bronchitis", "Healthy", "", None]
+        for nt in non_triggers:
+            is_trig, canonical = is_cluster_trigger_disease(nt)
+            self.assertFalse(is_trig, f"Should not match non-trigger: {nt}")
+            self.assertIsNone(canonical)
 
     def test_get_clusters_api(self):
         auth_headers = {"Authorization": "Basic YWRtaW46UG9kZEZhb1NlY3VyZTIwMjYh"}

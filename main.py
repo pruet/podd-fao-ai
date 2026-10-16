@@ -25,15 +25,35 @@ load_dotenv()
 from google.cloud import datastore
 from google.cloud import storage
 
-IS_GAE = os.getenv("GAE_ENV") == "standard" or "GAE_SERVICE" in os.environ
-if IS_GAE:
-    DB_PATH = "/tmp/api_logs.db"
-    LOGS_DIR = "/tmp/logs"
-else:
-    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "api_logs.db")
-    LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+from tenant import (
+    TenantContext,
+    TenantSigningKey,
+    TenantRegistry,
+    create_default_registry,
+    normalize_api_base_url,
+    TenantTokenManager,
+    LahisTenantClient,
+    validate_webhook_request,
+    verify_hmac_signature,
+    validate_timestamp_freshness
+)
+from storage import (
+    JobRecord,
+    init_sqlite_db,
+    record_cluster_report,
+    get_village_reports_for_date,
+    get_village_all_reports,
+    log_request_response,
+    get_or_create_job,
+    update_job,
+    DB_PATH,
+    LOGS_DIR,
+    USE_DATASTORE,
+    IS_GAE
+)
 
-USE_DATASTORE = IS_GAE or os.getenv("USE_DATASTORE") == "true"
+tenant_registry = create_default_registry()
+tenant_token_manager = TenantTokenManager()
 datastore_client = None
 
 if USE_DATASTORE:
@@ -117,200 +137,12 @@ def get_audit_image_bytes(filename: str) -> Optional[bytes]:
 
 
 def init_db():
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS api_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                method TEXT,
-                path TEXT,
-                status_code INTEGER,
-                latency REAL,
-                client_ip TEXT,
-                request_params TEXT,
-                response_body TEXT,
-                steps_json TEXT,
-                image_path TEXT,
-                prompt_tokens INTEGER DEFAULT 0,
-                output_tokens INTEGER DEFAULT 0
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS cluster_reports (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                date_str TEXT,
-                report_id TEXT,
-                village_id TEXT,
-                village_name TEXT,
-                raw_payload TEXT,
-                detected_disease TEXT
-            )
-        """)
-        # Run migrations if columns are missing
-        cursor.execute("PRAGMA table_info(api_logs)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "image_path" not in columns:
-            cursor.execute("ALTER TABLE api_logs ADD COLUMN image_path TEXT")
-        if "prompt_tokens" not in columns:
-            cursor.execute("ALTER TABLE api_logs ADD COLUMN prompt_tokens INTEGER DEFAULT 0")
-        if "output_tokens" not in columns:
-            cursor.execute("ALTER TABLE api_logs ADD COLUMN output_tokens INTEGER DEFAULT 0")
-
-        cursor.execute("PRAGMA table_info(cluster_reports)")
-        cluster_columns = [row[1] for row in cursor.fetchall()]
-        if "detected_disease" not in cluster_columns:
-            cursor.execute("ALTER TABLE cluster_reports ADD COLUMN detected_disease TEXT")
-
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error initializing DB: {e}")
+    init_sqlite_db()
 
 # Initialize DB on load
 init_db()
 
-def record_cluster_report(
-    report_id: str,
-    village_id: str,
-    village_name: Optional[str],
-    date_str: str,
-    raw_payload: str,
-    detected_disease: Optional[str] = None
-):
-    timestamp = datetime.now(timezone.utc).isoformat()
-    if USE_DATASTORE and datastore_client:
-        try:
-            key = datastore_client.key("ClusterReport")
-            entity = datastore.Entity(key=key, exclude_from_indexes=("raw_payload",))
-            entity.update({
-                "timestamp": timestamp,
-                "date_str": str(date_str),
-                "report_id": str(report_id),
-                "village_id": str(village_id),
-                "village_name": str(village_name or ""),
-                "raw_payload": raw_payload,
-                "detected_disease": str(detected_disease or "")
-            })
-            datastore_client.put(entity)
-            return
-        except Exception as e:
-            print(f"Error logging ClusterReport to Datastore: {e}")
-
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO cluster_reports (timestamp, date_str, report_id, village_id, village_name, raw_payload, detected_disease)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (timestamp, str(date_str), str(report_id), str(village_id), str(village_name or ""), raw_payload, str(detected_disease or "")))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error saving cluster report to DB: {e}")
-
-def get_village_reports_for_date(village_id: str, date_str: str) -> List[dict]:
-    if USE_DATASTORE and datastore_client:
-        try:
-            query = datastore_client.query(kind="ClusterReport")
-            query.add_filter("village_id", "=", str(village_id))
-            query.add_filter("date_str", "=", str(date_str))
-            results = list(query.fetch())
-            return [
-                {
-                    "id": entity.key.id,
-                    "timestamp": entity.get("timestamp"),
-                    "date_str": entity.get("date_str"),
-                    "report_id": entity.get("report_id"),
-                    "village_id": entity.get("village_id"),
-                    "village_name": entity.get("village_name"),
-                    "raw_payload": entity.get("raw_payload"),
-                    "detected_disease": entity.get("detected_disease", "")
-                }
-                for entity in results
-            ]
-        except Exception as e:
-            print(f"Error querying ClusterReport from Datastore: {e}")
-
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM cluster_reports WHERE village_id = ? AND date_str = ?",
-            (str(village_id), str(date_str))
-        )
-        rows = cursor.fetchall()
-        conn.close()
-        return [
-            {
-                "id": row["id"],
-                "timestamp": row["timestamp"],
-                "date_str": row["date_str"],
-                "report_id": row["report_id"],
-                "village_id": row["village_id"],
-                "village_name": row["village_name"],
-                "raw_payload": row["raw_payload"],
-                "detected_disease": row["detected_disease"] if "detected_disease" in row.keys() else ""
-            }
-            for row in rows
-        ]
-    except Exception as e:
-        print(f"Error querying cluster reports from DB: {e}")
-        return []
-
-def get_village_all_reports(village_id: str) -> List[dict]:
-    if USE_DATASTORE and datastore_client:
-        try:
-            query = datastore_client.query(kind="ClusterReport")
-            query.add_filter("village_id", "=", str(village_id))
-            results = list(query.fetch())
-            return [
-                {
-                    "id": entity.key.id,
-                    "timestamp": entity.get("timestamp"),
-                    "date_str": entity.get("date_str"),
-                    "report_id": entity.get("report_id"),
-                    "village_id": entity.get("village_id"),
-                    "village_name": entity.get("village_name"),
-                    "raw_payload": entity.get("raw_payload"),
-                    "detected_disease": entity.get("detected_disease", "")
-                }
-                for entity in results
-            ]
-        except Exception as e:
-            print(f"Error querying ClusterReport from Datastore: {e}")
-
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM cluster_reports WHERE village_id = ?",
-            (str(village_id),)
-        )
-        rows = cursor.fetchall()
-        conn.close()
-        return [
-            {
-                "id": row["id"],
-                "timestamp": row["timestamp"],
-                "date_str": row["date_str"],
-                "report_id": row["report_id"],
-                "village_id": row["village_id"],
-                "village_name": row["village_name"],
-                "raw_payload": row["raw_payload"],
-                "detected_disease": row["detected_disease"] if "detected_disease" in row.keys() else ""
-            }
-            for row in rows
-        ]
-    except Exception as e:
-        print(f"Error querying cluster reports from DB: {e}")
-        return []
-
-def get_ai_diagnosed_diseases_for_report(report_id: str) -> List[str]:
+def get_ai_diagnosed_diseases_for_report(report_id: str, tenant_key: Optional[str] = None) -> List[str]:
     if not report_id:
         return []
     diseases_found = []
@@ -319,6 +151,8 @@ def get_ai_diagnosed_diseases_for_report(report_id: str) -> List[str]:
         try:
             query = datastore_client.query(kind="ApiLog")
             query.add_filter("path", "=", "/analyze")
+            if tenant_key:
+                query.add_filter("tenant_key", "=", str(tenant_key))
             query.order = ["-timestamp"]
             results = list(query.fetch(limit=100))
             for entity in results:
@@ -339,10 +173,16 @@ def get_ai_diagnosed_diseases_for_report(report_id: str) -> List[str]:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT response_body FROM api_logs WHERE path = '/analyze' AND request_params LIKE ? ORDER BY id DESC LIMIT 10",
-            (f"%{report_id}%",)
-        )
+        if tenant_key:
+            cursor.execute(
+                "SELECT response_body FROM api_logs WHERE path = '/analyze' AND tenant_key = ? AND request_params LIKE ? ORDER BY id DESC LIMIT 10",
+                (str(tenant_key), f"%{report_id}%")
+            )
+        else:
+            cursor.execute(
+                "SELECT response_body FROM api_logs WHERE path = '/analyze' AND request_params LIKE ? ORDER BY id DESC LIMIT 10",
+                (f"%{report_id}%",)
+            )
         rows = cursor.fetchall()
         conn.close()
         for row in rows:
@@ -457,68 +297,6 @@ def authenticate_dashboard(credentials: HTTPBasicCredentials = Depends(security)
         )
     return credentials.username
 
-def log_request_response(method: str, path: str, status_code: int, latency: float, client_ip: str, request_params: dict, response_body: str, steps_json: Optional[dict] = None, image_path: Optional[str] = None, prompt_tokens: int = 0, output_tokens: int = 0):
-    def make_serializable(item):
-        if isinstance(item, dict):
-            return {k: make_serializable(v) for k, v in item.items()}
-        elif isinstance(item, list):
-            return [make_serializable(i) for i in item]
-        elif isinstance(item, (str, int, float, bool, type(None))):
-            return item
-        else:
-            return str(item)
-
-    if USE_DATASTORE and datastore_client:
-        try:
-            key = datastore_client.key("ApiLog")
-            entity = datastore.Entity(
-                key=key,
-                exclude_from_indexes=("response_body", "steps_json", "request_params", "image_path")
-            )
-            utc_now_iso = datetime.now(timezone.utc).isoformat()
-            entity.update({
-                "timestamp": utc_now_iso,
-                "method": method,
-                "path": path,
-                "status_code": status_code,
-                "latency": latency,
-                "client_ip": client_ip,
-                "request_params": json.dumps(make_serializable(request_params)),
-                "response_body": response_body,
-                "steps_json": json.dumps(make_serializable(steps_json)) if steps_json else None,
-                "image_path": image_path,
-                "prompt_tokens": prompt_tokens,
-                "output_tokens": output_tokens
-            })
-            datastore_client.put(entity)
-            return
-        except Exception as e:
-            print(f"Error logging to Datastore: {e}")
-
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO api_logs (timestamp, method, path, status_code, latency, client_ip, request_params, response_body, steps_json, image_path, prompt_tokens, output_tokens)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            datetime.now(timezone.utc).isoformat(),
-            method,
-            path,
-            status_code,
-            latency,
-            client_ip,
-            json.dumps(make_serializable(request_params)),
-            response_body,
-            json.dumps(make_serializable(steps_json)) if steps_json else None,
-            image_path,
-            prompt_tokens,
-            output_tokens
-        ))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error logging to DB: {e}")
 
 
 def load_animals_and_diseases():
@@ -564,7 +342,7 @@ def load_config():
             return json.load(f)
     return {
         "guardrail_policy": "Determine if the request involves an animal belonging to the ALLOWED animal species list:\n{allowed_animals}\n\nValidation Rules:\n1. For image-based diagnosis: Determine if the image depicts a living animal, animal carcass, or animal body parts (such as skin, mouth, organs, legs, etc.) of an allowed animal species. If the image does NOT contain any animal, carcass, or animal body part (e.g., contains only people, vehicles, buildings, landscapes, electronic devices, food, or general household items), you MUST set `is_valid_animal_image` to False and explain why in `invalid_reason` in {lang_name} language.\n2. For animal species validation (both image analysis and text-only symptom consultations): If the animal species is NOT in the allowed list above (such as horse, snake, elephant, monkey, wild bird, fish, etc.), you MUST set `is_valid_animal_image` to False and set `invalid_reason` to 'This is not an acceptable animal, we don't process [animal name]' translated into {lang_name} language (e.g., in Lao: 'ນີ້ບໍ່ແມ່ນສັດທີ່ຮອງຮັບ, ພວກເຮົາບໍ່ໄດ້ປະມວນຜົນ [animal name]', in Thai: 'นี่ไม่ใช่สัตว์ที่รองรับ เราไม่ประมวลผล [animal name]').\n3. If and only if it is a valid animal of an allowed species, set `is_valid_animal_image` to True.\n\nSTRICT DISEASE WHITELIST GUARDRAIL (Image-Based Diagnosis):\n- ONLY diseases that appear on the allowed Priority Reportable Diseases list for the identified animal species may be considered or suggested.\n- If the observed condition, symptoms, or suspected disease does NOT match any disease on the official allowed list, or if the detected disease is outside the allowed list, you MUST NOT provide any disease response (you MUST set `diseases` to an empty list `[]`). Under NO circumstances should you name or suggest any unlisted disease.\n\nSTRICT SYMPTOM-ONLY CONSULTATION GUARDRAIL (Text-Only Requests Without Images):\n- When analyzing clinical descriptions without images, DO NOT diagnose, name, suspect, or identify any specific disease under any circumstances.\n- Focus strictly on matching observed signs against the official reference symptoms handbook and providing condition management guidance.",
-        "prompt_template": "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. Evaluate symptoms ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the symptoms, list up to three with a confidence level (0.0 to 1.0), brief reasoning/symptoms observed, and basic response recommendations for local veterinarians without requiring laboratory testing in {lang_name} language.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, basic_response, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}",
+        "prompt_template": "Analyze the provided image(s) and clinical text description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nClinical Context & Reporter Information:\n- Text Description / Observed Clinical Signs: {description}\n- Stated Animal Species (if provided): {animal_species_context}\n\nMultimodal Diagnostic Guidelines:\n- MULTIMODAL SYNTHESIS: Perform a comprehensive multimodal veterinary evaluation by combining BOTH the visual evidence in the image(s) (e.g., visible lesions, blisters, vesicles, ulcers, erosions, discoloration, swellings, discharges, body posture, skin/mucosal changes) AND the clinical observations or history provided in the text description (e.g., high fever, sudden death, lameness, anorexia, salivation, diarrhea, coughing, abortion, progression rate, herd mortality).\n- The text description provides vital clinical context: use it alongside the image(s) to corroborate visual findings, differentiate diseases that share similar visual lesions, and assess overall disease severity.\n- If no text description is provided or if it states 'None provided', base your clinical evaluation solely on the visual findings in the image(s).\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal (confirming against the stated animal species if provided).\n2. Multimodal Disease Evaluation: Evaluate the combined visual symptoms from the image(s) and clinical signs from the description ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the combined visual and described symptoms, list up to three with a confidence level (0.0 to 1.0), reasoning explaining how both the visual lesions and the described clinical signs support the diagnosis, and basic response recommendations for local veterinarians without requiring laboratory testing in {lang_name} language.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, basic_response, and invalid_reason) in {lang_name} language.",
         "text_symptom_prompt_template": "You are an expert veterinary clinical symptom analyzer.\nThe user provided a clinical description of a sick animal without any image.\nAnimal Species: {animal_type} (Normalized: {norm_animal})\nDescription of observed signs and symptoms:\n{description}\n\nHere is the official reference list of 46 clinical symptoms:\n{symptoms_list_str}\n\nTasks:\n1. Identify which symptoms from the official reference list match the observed signs described in the text description.\n   Return their symptom numbers in `matched_symptom_numbers` (an empty list if none match).\n2. In `symptom_analysis`, provide a clear, supportive clinical assessment of the reported symptoms in {lang_name} language.\n3. For each matched symptom, look up its standard veterinary field handbook guidance and provide it in `symptom_guidance_entries` translated and written entirely in {lang_name} language.\n   Format each entry as: [Symptom Name in {lang_name}] Specific handbook guidance and practical field care steps in {lang_name} language.\n\nSTRICT CONSTRAINTS:\n- DO NOT name, diagnose, suspect, or identify any specific disease under any circumstances (e.g., do NOT mention FMD, Anthrax, Swine Fever, Rabies, etc.).\n- Focus strictly on the symptoms, clinical signs, and condition management.\n- All entries in `symptom_analysis` and `symptom_guidance_entries` MUST be written in {lang_name} language.\n- Return your response strictly matching the schema.",
         "cluster_trigger_diseases": [
             "Foot-and-mouth disease (FMD)",
@@ -580,8 +358,130 @@ def load_config():
 app = FastAPI(
     title="FAO-PODD Animal Disease Diagnosis API",
     description="Analyze animal images and descriptions to identify potential diseases.",
-    version="2.7.0"
+    version="2.11.3"
 )
+
+EXCLUDED_LOG_PREFIXES = (
+    "/api/logs",
+    "/api/clusters",
+    "/favicon.ico",
+    "/robots.txt",
+    "/static"
+)
+EXCLUDED_EXACT_GET_PATHS = (
+    "/",
+    "/index.html",
+    "/privacy",
+    "/home",
+    "/about",
+    "/landing"
+)
+
+@app.middleware("http")
+async def universal_request_logging_middleware(request: Request, call_next):
+    path = request.url.path
+    method = request.method
+
+    # Skip internal dashboard polling and static assets
+    if any(path.startswith(prefix) for prefix in EXCLUDED_LOG_PREFIXES):
+        return await call_next(request)
+    if method == "GET" and path in EXCLUDED_EXACT_GET_PATHS:
+        return await call_next(request)
+
+    start_time = time.time()
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+
+    request.state.logged = False
+
+    eff_tenant = (
+        request.headers.get("x-ohtk-tenant")
+        or request.headers.get("x-tenant-code")
+    )
+    req_params = {}
+    content_type = request.headers.get("content-type", "")
+
+    try:
+        if "application/json" in content_type:
+            raw_body = await request.body()
+            if raw_body:
+                try:
+                    req_params = json.loads(raw_body)
+                    if isinstance(req_params, dict):
+                        tenant_obj = req_params.get("tenant") or {}
+                        if isinstance(tenant_obj, dict) and not eff_tenant:
+                            eff_tenant = tenant_obj.get("schema") or tenant_obj.get("code")
+                except Exception:
+                    req_params = {"raw_body": raw_body[:1024].decode("utf-8", errors="ignore")}
+        elif "multipart/form-data" in content_type:
+            # Leave streaming multipart untouched for python-multipart
+            req_params = dict(request.query_params)
+            req_params["content_type"] = "multipart/form-data"
+        else:
+            if request.query_params:
+                req_params = dict(request.query_params)
+            if request.method in ("POST", "PUT", "PATCH"):
+                raw_body = await request.body()
+                if raw_body:
+                    try:
+                        req_params["raw"] = raw_body[:1024].decode("utf-8", errors="ignore")
+                    except Exception:
+                        pass
+    except Exception as e:
+        req_params = {"error_reading_request": str(e)}
+
+    response = None
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        latency = time.time() - start_time
+        if not getattr(request.state, "logged", False):
+            log_request_response(
+                method=method,
+                path=path,
+                status_code=500,
+                latency=latency,
+                client_ip=client_ip,
+                request_params=req_params,
+                response_body=json.dumps({"detail": f"Internal Server Error: {str(exc)}"}),
+                tenant_key=eff_tenant or "default"
+            )
+            request.state.logged = True
+        raise exc
+
+    if getattr(request.state, "logged", False):
+        return response
+
+    latency = time.time() - start_time
+    resp_body_bytes = b""
+    try:
+        async for chunk in response.body_iterator:
+            resp_body_bytes += chunk
+        new_response = Response(
+            content=resp_body_bytes,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type
+        )
+        resp_text = resp_body_bytes.decode("utf-8", errors="ignore")
+    except Exception as e:
+        new_response = response
+        resp_text = f"Error reading response body: {str(e)}"
+
+    log_request_response(
+        method=method,
+        path=path,
+        status_code=response.status_code,
+        latency=latency,
+        client_ip=client_ip,
+        request_params=req_params,
+        response_body=resp_text,
+        tenant_key=eff_tenant or "default"
+    )
+    request.state.logged = True
+    return new_response
 
 # Initialize GenAI Client
 # The client automatically picks up the GEMINI_API_KEY environment variable.
@@ -762,6 +662,8 @@ def get_symptom_advice(symptom_numbers: List[int], normalized_species: str, lang
     return [f"[{item['name']}] {item['text']}" for item in advice_items]
 
 async def get_lahis_token(client_id: str, client_secret: str, api_url: str) -> str:
+    if "prod.api.lahis.ohtk.org" in api_url:
+        api_url = api_url.replace("prod.api.lahis.ohtk.org", "production.api.lahis.ohtk.org")
     async with httpx.AsyncClient() as client:
         token_url = f"{api_url.rstrip('/')}/o/token/"
         data = {
@@ -781,6 +683,8 @@ async def get_lahis_token(client_id: str, client_secret: str, api_url: str) -> s
             )
 
 async def fetch_lahis_report_images(report_id: str, token: str, api_url: str) -> List[bytes]:
+    if "prod.api.lahis.ohtk.org" in api_url:
+        api_url = api_url.replace("prod.api.lahis.ohtk.org", "production.api.lahis.ohtk.org")
     async with httpx.AsyncClient() as client:
         report_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/images"
         headers = {"Authorization": f"Bearer {token}"}
@@ -898,6 +802,8 @@ def format_diagnosis_comment(result: dict, lang: str) -> str:
     return f"AI Analysis Result:\n- Animal Type: {animal_type}\n- Potential Diseases:\n{diseases_str}"
 
 async def submit_lahis_comment(report_id: str, event_id: str, body_text: str, confidence: float, tenant_api_url: str, token: str):
+    if "prod.api.lahis.ohtk.org" in tenant_api_url:
+        tenant_api_url = tenant_api_url.replace("prod.api.lahis.ohtk.org", "production.api.lahis.ohtk.org")
     async with httpx.AsyncClient() as client:
         comments_url = f"{tenant_api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/comments"
         headers = {
@@ -974,21 +880,41 @@ async def submit_lahis_cluster(cluster_payload: dict, token: str, api_url: str) 
                 detail=f"Failed to submit cluster result to LAHIS: {str(e)}"
             )
 
+@app.get("/webhooks/lahis")
+async def webhooks_lahis_health():
+    return {"status": "ok", "message": "LAHIS webhook endpoint is active. Webhooks must be sent as HTTP POST with HMAC signature."}
+
 @app.post("/analyze", response_model=DiagnosisResponse)
+@app.post("/webhooks/lahis", response_model=DiagnosisResponse)
 async def analyze_animal_image(
     request: Request,
     images: Optional[List[UploadFile]] = File(None, description="Images of the sick/diseased animal"),
     report_id: Optional[str] = Form(None, description="LAHIS Report ID to fetch the image from"),
     description: Optional[str] = Form(None, description="Optional text description of signs/symptoms"),
     animal_type: Optional[str] = Form(None, description="Animal type / species when submitting without image"),
-    lang: str = Form("en", description="Language for response: 'en' (English), 'th' (Thai), 'lo' (Lao)")
+    lang: str = Form("en", description="Language for response: 'en' (English), 'th' (Thai), 'lo' (Lao)"),
+    tenant_code: Optional[str] = Form(None, description="Optional tenant code (e.g. 'local tester')")
 ):
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
     saved_image_path = None
     prompt_tokens = 0
     output_tokens = 0
+    tenant_key = "default"
+    tenant_ctx = None
+    tenant_client = None
+    job = None
     
+    eff_tenant_code = (
+        tenant_code
+        or request.headers.get("x-tenant-code")
+        or request.headers.get("x-ohtk-tenant")
+    )
+    if not eff_tenant_code and request.headers.get("x-source") == "web-tester":
+        eff_tenant_code = "local tester"
+    if eff_tenant_code:
+        tenant_key = eff_tenant_code
+
     # Initialize request_params early to prevent UnboundLocalError in exception handler
     request_params = {
         "lang": lang,
@@ -996,7 +922,10 @@ async def analyze_animal_image(
         "animal_type": animal_type,
         "report_id": report_id,
         "image_filenames": [img.filename for img in images] if images else [],
-        "source": request.headers.get("x-source", "api")
+        "source": request.headers.get("x-source", "api"),
+        "tenant": {
+            "code": eff_tenant_code
+        } if eff_tenant_code else None
     }
     steps = {
         "step_1": {
@@ -1009,6 +938,7 @@ async def analyze_animal_image(
         content_type = request.headers.get("content-type", "")
         is_json = "application/json" in content_type
         event_id = "unknown-event"
+        raw_body = b""
         
         if is_json:
             raw_body = await request.body()
@@ -1018,47 +948,133 @@ async def analyze_animal_image(
             except Exception:
                 request_params = {"raw_body": raw_body.decode("utf-8", errors="ignore")}
                 raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+            if isinstance(body, dict):
+                t_obj = body.get("tenant") or {}
+                if isinstance(t_obj, dict):
+                    t_cand = t_obj.get("schema") or t_obj.get("code")
+                    if t_cand:
+                        tenant_key = t_cand
+
+            is_multi_tenant = bool(
+                request.headers.get("x-ohtk-tenant")
+                or request.headers.get("x-ohtk-signing-key-id")
+                or request.headers.get("x-ohtk-signature-alg")
+                or (isinstance(body.get("tenant"), dict) and body.get("tenant", {}).get("apiBaseUrl"))
+            )
+
+            if is_multi_tenant:
+                tenant_ctx, body = await validate_webhook_request(
+                    request=request,
+                    raw_body=raw_body,
+                    registry=tenant_registry,
+                    expected_operation=["report.submitted", "ai.evaluation_requested"]
+                )
+                tenant_key = tenant_ctx.tenant_key
+                tenant_client = LahisTenantClient(tenant_ctx, tenant_token_manager)
+                api_url = tenant_ctx.api_base_url
+                lang = tenant_ctx.lang
+                event_type = body.get("eventType")
+                event_id = body.get("eventId") or "unknown-event"
+                report_data = body.get("report") or {}
+                report_id = report_data.get("id")
+                if not report_id:
+                    raise HTTPException(status_code=400, detail="Missing report.id in payload")
+                raw_desc = (
+                    report_data.get("description")
+                    or report_data.get("remarks")
+                    or report_data.get("symptoms")
+                    or report_data.get("symptom")
+                    or report_data.get("notes")
+                    or body.get("description")
+                    or ""
+                )
+                event_info = f"Webhook Event ID: {event_id}. Report Type: {report_data.get('reportType', {}).get('name', 'Unknown')}"
+                description = f"{raw_desc} ({event_info})" if raw_desc else event_info
+                if not animal_type:
+                    rep_animal = report_data.get("animalType") or report_data.get("animal_type") or body.get("animal_type")
+                    if isinstance(rep_animal, dict):
+                        animal_type = rep_animal.get("name") or rep_animal.get("name_en")
+                    elif isinstance(rep_animal, str):
+                        animal_type = rep_animal
+
+                job, job_action = get_or_create_job(
+                    tenant_key=tenant_key,
+                    integration_code=tenant_ctx.integration_code,
+                    operation=event_type or "report.submitted",
+                    event_id=event_id,
+                    raw_body_bytes=raw_body,
+                    request_payload=body
+                )
+                if job_action == "replay":
+                    if job.status == "COMPLETED" and job.model_result:
+                        return DiagnosisResponse(**job.model_result)
+                    elif job.status in ("ACCEPTED", "RUNNING", "CALLBACK_PENDING") and job.model_result:
+                        return DiagnosisResponse(**job.model_result)
+                update_job(job.job_key, status="RUNNING")
+            else:
+                timestamp = request.headers.get("x-ohtk-timestamp", "")
+                signature = request.headers.get("x-ohtk-signature", "")
                 
-            timestamp = request.headers.get("x-ohtk-timestamp", "")
-            signature = request.headers.get("x-ohtk-signature", "")
-            
-            signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
-            if signing_secret:
-                if not signature or not timestamp:
-                    raise HTTPException(status_code=401, detail="Missing signature headers")
-                
-                path = request.url.path
-                alt_path = path + "/" if not path.endswith("/") else path[:-1]
-                
-                sig_ok = verify_webhook_signature(path, timestamp, raw_body, signature)
-                if not sig_ok:
-                    sig_ok = verify_webhook_signature(alt_path, timestamp, raw_body, signature)
+                signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
+                if signing_secret:
+                    if not signature or not timestamp:
+                        raise HTTPException(status_code=401, detail="Missing signature headers")
                     
-                if not sig_ok:
-                    raise HTTPException(status_code=401, detail="Invalid webhook signature")
+                    path = request.url.path
+                    alt_path = path + "/" if not path.endswith("/") else path[:-1]
                     
-            event_type = body.get("eventType")
-            if event_type != "report.submitted":
-                raise HTTPException(status_code=400, detail=f"Unsupported eventType: {event_type}")
-                
-            report_data = body.get("report") or {}
-            report_id = report_data.get("id")
-            if not report_id:
-                raise HTTPException(status_code=400, detail="Missing report.id in payload")
-                
-            event_id = body.get("eventId") or "unknown-event"
-            lang = os.getenv("LAHIS_LANG", "lo")
-            description = f"Webhook Event ID: {event_id}. Report Type: {report_data.get('reportType', {}).get('name', 'Unknown')}"
-            if not animal_type and "animal_type" in body:
-                animal_type = body.get("animal_type")
+                    sig_ok = verify_webhook_signature(path, timestamp, raw_body, signature)
+                    if not sig_ok:
+                        sig_ok = verify_webhook_signature(alt_path, timestamp, raw_body, signature)
+                        
+                    if not sig_ok:
+                        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+                        
+                event_type = body.get("eventType")
+                if event_type not in ["report.submitted", "ai.evaluation_requested"]:
+                    raise HTTPException(status_code=400, detail=f"Unsupported eventType: {event_type}")
+                    
+                report_data = body.get("report") or {}
+                report_id = report_data.get("id")
+                if not report_id:
+                    raise HTTPException(status_code=400, detail="Missing report.id in payload")
+                    
+                event_id = body.get("eventId") or "unknown-event"
+                lang = os.getenv("LAHIS_LANG", "lo")
+                raw_desc = (
+                    report_data.get("description")
+                    or report_data.get("remarks")
+                    or report_data.get("symptoms")
+                    or report_data.get("symptom")
+                    or report_data.get("notes")
+                    or body.get("description")
+                    or ""
+                )
+                event_info = f"Webhook Event ID: {event_id}. Report Type: {report_data.get('reportType', {}).get('name', 'Unknown')}"
+                description = f"{raw_desc} ({event_info})" if raw_desc else event_info
+                if not animal_type:
+                    rep_animal = report_data.get("animalType") or report_data.get("animal_type") or body.get("animal_type")
+                    if isinstance(rep_animal, dict):
+                        animal_type = rep_animal.get("name") or rep_animal.get("name_en")
+                    elif isinstance(rep_animal, str):
+                        animal_type = rep_animal
         else:
+            eff_tenant_code = tenant_code or request.headers.get("x-tenant-code")
+            if not eff_tenant_code and request.headers.get("x-source") == "web-tester":
+                eff_tenant_code = "local tester"
+            if eff_tenant_code:
+                tenant_key = eff_tenant_code
             request_params = {
                 "lang": lang,
                 "description": description,
                 "animal_type": animal_type,
                 "report_id": report_id,
                 "image_filenames": [img.filename for img in images] if images else [],
-                "source": request.headers.get("x-source", "api")
+                "source": request.headers.get("x-source", "api"),
+                "tenant": {
+                    "code": eff_tenant_code
+                } if eff_tenant_code else None
             }
         steps["step_1"]["data"] = request_params
         print(f"[STEP 1] Request from LAHIS. Content-Type: {content_type}, is_json: {is_json}, params/body: {json.dumps(request_params)}")
@@ -1069,9 +1085,9 @@ async def analyze_animal_image(
             raise HTTPException(status_code=400, detail="Either image files or report_id must be provided. Alternatively, provide description and animal_type for text symptom consultation.")
         
         multiple_images_bytes = []
-        api_url = os.getenv("TENANT_API_URL")
-        client_id = os.getenv("LAHIS_CLIENT_ID")
-        client_secret = os.getenv("LAHIS_CLIENT_SECRET")
+        api_url = tenant_ctx.api_base_url if tenant_ctx else os.getenv("TENANT_API_URL")
+        client_id = tenant_ctx.oauth_client_id if tenant_ctx else os.getenv("LAHIS_CLIENT_ID")
+        client_secret = tenant_ctx.oauth_client_secret if tenant_ctx else os.getenv("LAHIS_CLIENT_SECRET")
         token = None
         
         if images and not is_json:
@@ -1083,15 +1099,17 @@ async def analyze_animal_image(
                 except Exception as e:
                     raise HTTPException(status_code=400, detail=f"Invalid image file {img.filename}: {str(e)}")
         elif report_id:
-            # Fetch image bytes from LAHIS API
-            if not all([api_url, client_id, client_secret]):
-                raise HTTPException(
-                    status_code=500,
-                    detail="LAHIS integration environment variables (TENANT_API_URL, LAHIS_CLIENT_ID, LAHIS_CLIENT_SECRET) are not fully configured."
-                )
-                
-            token = await get_lahis_token(client_id, client_secret, api_url)
-            multiple_images_bytes = await fetch_lahis_report_images(report_id, token, api_url)
+            if tenant_client:
+                multiple_images_bytes = await tenant_client.fetch_all_report_images_bytes(report_id)
+            else:
+                if not all([api_url, client_id, client_secret]):
+                    raise HTTPException(
+                        status_code=500,
+                        detail="LAHIS integration environment variables (TENANT_API_URL, LAHIS_CLIENT_ID, LAHIS_CLIENT_SECRET) are not fully configured."
+                    )
+                token = await get_lahis_token(client_id, client_secret, api_url)
+                multiple_images_bytes = await fetch_lahis_report_images(report_id, token, api_url)
+            pass
             
         has_images = len(multiple_images_bytes) > 0
 
@@ -1285,22 +1303,42 @@ STRICT CONSTRAINTS:
 
             prompt_template = config.get(
                 "prompt_template",
-                "Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. Evaluate symptoms ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the symptoms, list up to three with a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description}"
+                "Analyze the provided image(s) and clinical text description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nAllowed Priority Reportable Diseases List by Animal Species:\n{allowed_diseases}\n\nClinical Context & Reporter Information:\n- Text Description / Observed Clinical Signs: {description}\n- Stated Animal Species (if provided): {animal_species_context}\n\nMultimodal Diagnostic Guidelines:\n- MULTIMODAL SYNTHESIS: Perform a comprehensive multimodal veterinary evaluation by combining BOTH the visual evidence in the image(s) (e.g., visible lesions, blisters, vesicles, ulcers, erosions, discoloration, swellings, discharges, body posture, skin/mucosal changes) AND the clinical observations or history provided in the text description (e.g., high fever, sudden death, lameness, anorexia, salivation, diarrhea, coughing, abortion, progression rate, herd mortality).\n- The text description provides vital clinical context: use it alongside the image(s) to corroborate visual findings, differentiate diseases that share similar visual lesions, and assess overall disease severity.\n- If no text description is provided or if it states 'None provided', base your clinical evaluation solely on the visual findings in the image(s).\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal (confirming against the stated animal species if provided).\n2. Multimodal Disease Evaluation: Evaluate the combined visual symptoms from the image(s) and clinical signs from the description ONLY against the allowed Priority Reportable Diseases list for that animal species. If the detected/suspected disease is NOT on this list, do NOT provide any disease suggestions (return `diseases: []`).\n3. If one or more diseases from the allowed list match the combined visual and described symptoms, list up to three with a confidence level (0.0 to 1.0), reasoning explaining how both the visual lesions and the described clinical signs support the diagnosis, and basic response recommendations for local veterinarians without requiring laboratory testing in {lang_name} language.\n4. If the confidence level is less than 0.8, you should not show the diseases suggestion, but ask the user to provide more information about the disease, perform additional lab testing, or gather more information.\n\nStrict Constraints:\n- NEVER diagnose, mention, or suggest any disease that is not explicitly on the allowed Priority Reportable Diseases list for that animal species. If not on the list, return `diseases: []`.\n- If the animal is not in the allowed list, `is_valid_animal_image` MUST be False and `invalid_reason` MUST state 'This is not an acceptable animal, we don't process [animal name]' in {lang_name} language.\n- You MUST output the entire response (including animal type, disease names, reasoning, basic_response, and invalid_reason) in {lang_name} language."
             )
             if "{allowed_diseases}" in prompt_template:
                 prompt_template = prompt_template.replace("{allowed_diseases}", allowed_diseases_text)
             if "{allowed_animals}" in prompt_template:
                 prompt_template = prompt_template.replace("{allowed_animals}", allowed_animals_text)
 
+            animal_species_context = animal_type if animal_type else "Not specified (determine from image)"
+            formatted_description = description if description and description.strip() else "None provided (analyze based purely on image)"
+
             try:
                 prompt = prompt_template.format(
                     guardrail_policy=guardrail_policy,
                     lang_name=lang_name,
-                    description=description or 'None provided'
+                    description=formatted_description,
+                    animal_species_context=animal_species_context,
+                    animal_type=animal_type or "Not specified"
                 )
             except Exception as e:
                 print(f"Error formatting prompt_template from config.json: {e}")
-                prompt = f"Analyze the provided image(s) and description.\n\nGuardrail Policy:\n{guardrail_policy}\n\nTasks (Execute ONLY if `is_valid_animal_image` is True):\n1. Identify the type of animal.\n2. List up to three possible diseases affecting the animal in the image(s).\n3. For each disease, provide a confidence level (0.0 to 1.0) and brief reasoning/symptoms observed.\n\nConstraints:\n- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language.\n- If a text description is provided below, incorporate it into your analysis:\n  Description: {description or 'None provided'}"
+                prompt = (
+                    f"Analyze the provided image(s) and clinical text description.\n\n"
+                    f"Guardrail Policy:\n{guardrail_policy}\n\n"
+                    f"Clinical Context & Reporter Information:\n"
+                    f"- Text Description / Observed Clinical Signs: {formatted_description}\n"
+                    f"- Stated Animal Species: {animal_species_context}\n\n"
+                    f"Multimodal Diagnostic Guidelines:\n"
+                    f"- Synthesize BOTH the visual evidence in the image(s) and the clinical observations in the text description.\n"
+                    f"- Use the description directly alongside the image(s) to corroborate lesions and differentiate diseases.\n\n"
+                    f"Tasks (Execute ONLY if `is_valid_animal_image` is True):\n"
+                    f"1. Identify the type of animal.\n"
+                    f"2. Multimodal Disease Evaluation: Evaluate the combined visual symptoms and described clinical signs against the allowed Priority Reportable Diseases list for that animal species.\n"
+                    f"3. List up to three matching diseases with a confidence level (0.0 to 1.0), reasoning explaining how visual findings and described symptoms support the diagnosis, and basic response recommendations in {lang_name} language.\n\n"
+                    f"Constraints:\n"
+                    f"- You MUST output the entire response (including animal type, disease names, reasoning, and invalid_reason) in {lang_name} language."
+                )
             
             steps["step_2"] = {
                 "title": "2. Request to Google AI",
@@ -1346,6 +1384,9 @@ STRICT CONSTRAINTS:
                 }
             }
         
+        if job:
+            update_job(job.job_key, status="RESULT_READY", model_result=result)
+
         # If it was a webhook, post the feedback comment back to LAHIS
         if is_json:
             comment_body = format_diagnosis_comment(result, lang)
@@ -1353,14 +1394,11 @@ STRICT CONSTRAINTS:
             highest_confidence = 0.0
             for d in (result.get("diseases") or []):
                 highest_confidence = max(highest_confidence, d.get("confidence", 0.0))
-            
-            # Re-fetch or reuse token to call comments API
-            if not token:
-                token = await get_lahis_token(client_id, client_secret, api_url)
-            
-            comments_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/comments"
+
+            comments_url = f"{api_url.rstrip('/')}/api/integrations/v1/reports/{report_id}/comments" if api_url else ""
+            idempotency_key = f"ai-feedback-{event_id}"
             payload = {
-                "externalActionId": f"ai-feedback-{event_id}",
+                "externalActionId": idempotency_key,
                 "body": comment_body,
                 "visibility": "staff",
                 "metadata": {
@@ -1379,13 +1417,27 @@ STRICT CONSTRAINTS:
                     "payload": payload
                 }
             }
+            if job:
+                update_job(job.job_key, status="CALLBACK_PENDING", callback_payload=payload)
+
             try:
-                comment_response = await submit_lahis_comment(report_id, event_id, comment_body, highest_confidence, api_url, token)
+                if tenant_client:
+                    comment_response = await tenant_client.submit_comment(report_id, idempotency_key, payload)
+                else:
+                    if not token and all([client_id, client_secret, api_url]):
+                        token = await get_lahis_token(client_id, client_secret, api_url)
+                    comment_response = await submit_lahis_comment(report_id, event_id, comment_body, highest_confidence, api_url, token)
+
+                if job:
+                    update_job(job.job_key, status="COMPLETED", callback_response=comment_response)
+
                 steps["step_5"] = {
                     "title": "5. Response back from LAHIS",
                     "data": comment_response
                 }
             except HTTPException as e:
+                if job:
+                    update_job(job.job_key, status="FAILED", error_message=e.detail)
                 steps["step_5"] = {
                     "title": "5. Response back from LAHIS (Error)",
                     "data": {
@@ -1396,8 +1448,8 @@ STRICT CONSTRAINTS:
                 # Log intermediate steps before raising
                 latency = time.time() - start_time
                 log_request_response(
-                    method="POST",
-                    path="/analyze",
+                    method=request.method,
+                    path=request.url.path,
                     status_code=e.status_code,
                     latency=latency,
                     client_ip=client_ip,
@@ -1406,8 +1458,10 @@ STRICT CONSTRAINTS:
                     steps_json=steps,
                     image_path=saved_image_path,
                     prompt_tokens=prompt_tokens,
-                    output_tokens=output_tokens
+                    output_tokens=output_tokens,
+                    tenant_key=tenant_key
                 )
+                request.state.logged = True
                 raise e
 
         # Automated Priority Cluster Processing (Option A: Both /detect-cluster and post-/analyze)
@@ -1424,15 +1478,33 @@ STRICT CONSTRAINTS:
             village_id = None
             village_name = None
             incident_loc = None
-            incident_date = datetime.utcnow().strftime("%Y-%m-%d")
+            incident_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
             if is_json:
                 report_data = body.get("report") or {}
                 if report_data.get("incidentDate"):
                     incident_date = report_data.get("incidentDate")
 
-            # Try to fetch fuller incident detail if token & api_url are available
-            if all([api_url, client_id, client_secret]):
+            # Try to fetch fuller incident detail
+            if tenant_client:
+                try:
+                    inc_detail = await tenant_client.fetch_incident(report_id)
+                    inc_obj = inc_detail.get("incident") or inc_detail
+                    v_info = inc_obj.get("village") or {}
+                    village_id = v_info.get("id") or inc_obj.get("villageId") or inc_obj.get("village_id")
+                    village_name = v_info.get("name") or inc_obj.get("villageName") or inc_obj.get("village_name")
+                    incident_loc = inc_obj.get("location")
+                    if inc_obj.get("incidentDate"):
+                        incident_date = inc_obj.get("incidentDate")
+                    if not village_id:
+                        rel_auth = inc_obj.get("relevantAuthorityIds") or []
+                        if rel_auth:
+                            village_id = f"auth-{rel_auth[0]}"
+                        elif incident_loc:
+                            village_id = f"loc-{incident_loc.get('lat')},{incident_loc.get('lon')}"
+                except Exception as e:
+                    print(f"Error fetching incident detail for automated cluster creation: {e}")
+            elif all([api_url, client_id, client_secret]):
                 try:
                     if not token:
                         token = await get_lahis_token(client_id, client_secret, api_url)
@@ -1460,19 +1532,20 @@ STRICT CONSTRAINTS:
                 else:
                     village_id = "default_village"
 
-            # 1. Record cluster report in DB with detected disease
+            # 1. Record cluster report in DB with detected disease and tenant_key
             record_cluster_report(
                 report_id=str(report_id),
                 village_id=str(village_id),
                 village_name=village_name,
                 date_str=incident_date,
                 raw_payload=json.dumps(request_params),
-                detected_disease=detected_priority_disease
+                detected_disease=detected_priority_disease,
+                tenant_key=tenant_key
             )
 
             # 2. Automatically submit cluster to LAHIS if incoming webhook
-            if is_json and all([api_url, client_id, client_secret]) and token:
-                all_village_reports = get_village_all_reports(str(village_id))
+            if is_json and (tenant_client or (all([api_url, client_id, client_secret]) and token)):
+                all_village_reports = get_village_all_reports(str(village_id), tenant_key=tenant_key)
                 all_incident_ids = list(set([r["report_id"] for r in all_village_reports if r.get("report_id")]))
                 if report_id not in all_incident_ids:
                     all_incident_ids.append(report_id)
@@ -1480,8 +1553,11 @@ STRICT CONSTRAINTS:
                 village_id_int = int(village_id) if str(village_id).isdigit() else None
                 authority_ids = (body.get("report") or {}).get("relevantAuthorityIds") if is_json else []
 
+                schema_slug = tenant_ctx.schema if tenant_ctx else "legacy"
+                cluster_external_id = f"cluster-{schema_slug}-{village_id}-{incident_date}"
+
                 cluster_payload = {
-                    "externalClusterId": f"cluster-{village_id}-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
+                    "externalClusterId": cluster_external_id,
                     "algorithmVersion": "podd-cluster-detector-v2",
                     "window": {
                         "from": incident_date,
@@ -1498,11 +1574,15 @@ STRICT CONSTRAINTS:
                     "metadata": {
                         "source": "fao-podd-ai-analyzer",
                         "detected_disease": detected_priority_disease,
-                        "report_count": len(all_incident_ids)
+                        "report_count": len(all_incident_ids),
+                        "tenant_key": tenant_key
                     }
                 }
                 try:
-                    cluster_sub_resp = await submit_lahis_cluster(cluster_payload, token, api_url)
+                    if tenant_client:
+                        cluster_sub_resp = await tenant_client.submit_cluster(cluster_external_id, cluster_payload)
+                    else:
+                        cluster_sub_resp = await submit_lahis_cluster(cluster_payload, token, api_url)
                     steps["step_6"] = {
                         "title": "6. Automated Priority Cluster Submission to LAHIS",
                         "data": {
@@ -1520,8 +1600,8 @@ STRICT CONSTRAINTS:
         # Log success
         latency = time.time() - start_time
         log_request_response(
-            method="POST",
-            path="/analyze",
+            method=request.method,
+            path=request.url.path,
             status_code=200,
             latency=latency,
             client_ip=client_ip,
@@ -1530,17 +1610,17 @@ STRICT CONSTRAINTS:
             steps_json=steps,
             image_path=saved_image_path,
             prompt_tokens=prompt_tokens,
-            output_tokens=output_tokens
+            output_tokens=output_tokens,
+            tenant_key=tenant_key
         )
+        request.state.logged = True
         return result
 
     except HTTPException as e:
-        # Avoid double logging if already logged in the inner try block
-        # (Though status_code could be 502, let's log if not already written)
         latency = time.time() - start_time
         log_request_response(
-            method="POST",
-            path="/analyze",
+            method=request.method,
+            path=request.url.path,
             status_code=e.status_code,
             latency=latency,
             client_ip=client_ip,
@@ -1549,14 +1629,16 @@ STRICT CONSTRAINTS:
             steps_json=steps,
             image_path=saved_image_path,
             prompt_tokens=prompt_tokens,
-            output_tokens=output_tokens
+            output_tokens=output_tokens,
+            tenant_key=tenant_key
         )
+        request.state.logged = True
         raise e
     except Exception as e:
         latency = time.time() - start_time
         log_request_response(
-            method="POST",
-            path="/analyze",
+            method=request.method,
+            path=request.url.path,
             status_code=500,
             latency=latency,
             client_ip=client_ip,
@@ -1565,8 +1647,10 @@ STRICT CONSTRAINTS:
             steps_json=steps,
             image_path=saved_image_path,
             prompt_tokens=prompt_tokens,
-            output_tokens=output_tokens
+            output_tokens=output_tokens,
+            tenant_key=tenant_key
         )
+        request.state.logged = True
         raise HTTPException(status_code=500, detail=f"Error generating analysis: {str(e)}")
 
 @app.post("/detect-cluster")
@@ -1575,17 +1659,31 @@ async def detect_cluster(
     images: Optional[List[UploadFile]] = File(None, description="Optional images"),
     report_id: Optional[str] = Form(None, description="LAHIS Report ID"),
     description: Optional[str] = Form(None, description="Optional text description"),
-    lang: str = Form("en", description="Language for response: 'en', 'th', 'lo'")
+    lang: str = Form("en", description="Language for response: 'en', 'th', 'lo'"),
+    tenant_code: Optional[str] = Form(None, description="Optional tenant code (e.g. 'local tester')")
 ):
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
+    tenant_key = "default"
+    tenant_ctx = None
+    tenant_client = None
+    job = None
     
+    eff_tenant_code = tenant_code or request.headers.get("x-tenant-code")
+    if not eff_tenant_code and request.headers.get("x-source") == "web-tester":
+        eff_tenant_code = "local tester"
+    if eff_tenant_code:
+        tenant_key = eff_tenant_code
+
     request_params = {
         "lang": lang,
         "description": description,
         "report_id": report_id,
         "image_filenames": [img.filename for img in images] if images else [],
-        "source": request.headers.get("x-source", "api")
+        "source": request.headers.get("x-source", "api"),
+        "tenant": {
+            "code": eff_tenant_code
+        } if eff_tenant_code else None
     }
     steps = {
         "step_1": {
@@ -1608,46 +1706,87 @@ async def detect_cluster(
             except Exception:
                 request_params = {"raw_body": raw_body_bytes.decode("utf-8", errors="ignore")}
                 raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+            is_multi_tenant = bool(
+                request.headers.get("x-ohtk-tenant")
+                or request.headers.get("x-ohtk-signing-key-id")
+                or request.headers.get("x-ohtk-signature-alg")
+                or (isinstance(body.get("tenant"), dict) and body.get("tenant", {}).get("apiBaseUrl"))
+            )
+
+            if is_multi_tenant:
+                tenant_ctx, body = await validate_webhook_request(
+                    request=request,
+                    raw_body=raw_body_bytes,
+                    registry=tenant_registry,
+                    expected_operation=("report.submitted", "detect-cluster")
+                )
+                tenant_key = tenant_ctx.tenant_key
+                tenant_client = LahisTenantClient(tenant_ctx, tenant_token_manager)
+                api_url = tenant_ctx.api_base_url
+                event_id = body.get("eventId") or "unknown-event"
+                report_data = body.get("report") or {}
+                report_id = report_data.get("id")
+                if not report_id:
+                    raise HTTPException(status_code=400, detail="Missing report.id in payload")
+
+                job, job_action = get_or_create_job(
+                    tenant_key=tenant_key,
+                    integration_code=tenant_ctx.integration_code,
+                    operation="detect-cluster",
+                    event_id=event_id,
+                    raw_body_bytes=raw_body_bytes,
+                    request_payload=body
+                )
+                if job_action == "replay":
+                    if job.status == "COMPLETED" and job.model_result:
+                        return job.model_result
+                    elif job.status in ("ACCEPTED", "RUNNING", "CALLBACK_PENDING") and job.model_result:
+                        return job.model_result
+                update_job(job.job_key, status="RUNNING")
+            else:
+                timestamp = request.headers.get("x-ohtk-timestamp", "")
+                signature = request.headers.get("x-ohtk-signature", "")
                 
-            timestamp = request.headers.get("x-ohtk-timestamp", "")
-            signature = request.headers.get("x-ohtk-signature", "")
-            
-            signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
-            if signing_secret:
-                if not signature or not timestamp:
-                    raise HTTPException(status_code=401, detail="Missing signature headers")
+                signing_secret = os.getenv("LAHIS_SIGNING_SECRET")
+                if signing_secret:
+                    if not signature or not timestamp:
+                        raise HTTPException(status_code=401, detail="Missing signature headers")
+                    
+                    path = request.url.path
+                    alt_path = path + "/" if not path.endswith("/") else path[:-1]
+                    
+                    sig_ok = verify_webhook_signature(path, timestamp, raw_body_bytes, signature)
+                    if not sig_ok:
+                        sig_ok = verify_webhook_signature(alt_path, timestamp, raw_body_bytes, signature)
+                    if not sig_ok:
+                        raise HTTPException(status_code=401, detail="Invalid webhook signature")
                 
-                path = request.url.path
-                alt_path = path + "/" if not path.endswith("/") else path[:-1]
-                
-                sig_ok = verify_webhook_signature(path, timestamp, raw_body_bytes, signature)
-                if not sig_ok:
-                    sig_ok = verify_webhook_signature(alt_path, timestamp, raw_body_bytes, signature)
-                if not sig_ok:
-                    raise HTTPException(status_code=401, detail="Invalid webhook signature")
-            
-            report_data = body.get("report") or {}
-            report_id = report_data.get("id")
-            if not report_id:
-                raise HTTPException(status_code=400, detail="Missing report.id in payload")
-            event_id = body.get("eventId") or "unknown-event"
+                report_data = body.get("report") or {}
+                report_id = report_data.get("id")
+                if not report_id:
+                    raise HTTPException(status_code=400, detail="Missing report.id in payload")
+                event_id = body.get("eventId") or "unknown-event"
             
         if not report_id:
             raise HTTPException(status_code=400, detail="report_id is required for cluster detection.")
             
-        api_url = os.getenv("TENANT_API_URL")
-        client_id = os.getenv("LAHIS_CLIENT_ID")
-        client_secret = os.getenv("LAHIS_CLIENT_SECRET")
+        api_url = tenant_ctx.api_base_url if tenant_ctx else os.getenv("TENANT_API_URL")
+        client_id = tenant_ctx.oauth_client_id if tenant_ctx else os.getenv("LAHIS_CLIENT_ID")
+        client_secret = tenant_ctx.oauth_client_secret if tenant_ctx else os.getenv("LAHIS_CLIENT_SECRET")
+        token = None
         
-        if not all([api_url, client_id, client_secret]):
-            raise HTTPException(
-                status_code=500,
-                detail="LAHIS integration environment variables (TENANT_API_URL, LAHIS_CLIENT_ID, LAHIS_CLIENT_SECRET) are not fully configured."
-            )
-            
-        # Step 2: Get OAuth token & fetch incident detail from LAHIS
-        token = await get_lahis_token(client_id, client_secret, api_url)
-        incident_data = await fetch_lahis_incident_detail(report_id, token, api_url)
+        # Step 2: Fetch incident detail from LAHIS
+        if tenant_client:
+            incident_data = await tenant_client.fetch_incident(report_id)
+        else:
+            if not all([api_url, client_id, client_secret]):
+                raise HTTPException(
+                    status_code=500,
+                    detail="LAHIS integration environment variables (TENANT_API_URL, LAHIS_CLIENT_ID, LAHIS_CLIENT_SECRET) are not fully configured."
+                )
+            token = await get_lahis_token(client_id, client_secret, api_url)
+            incident_data = await fetch_lahis_incident_detail(report_id, token, api_url)
         
         steps["step_2"] = {
             "title": "2. Fetched Incident Detail from LAHIS",
@@ -1671,7 +1810,7 @@ async def detect_cluster(
             else:
                 village_id = "default_village"
                 
-        incident_date = incident.get("incidentDate") or datetime.utcnow().strftime("%Y-%m-%d")
+        incident_date = incident.get("incidentDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         # Load config to get trigger diseases list
         config = load_config()
@@ -1697,8 +1836,8 @@ async def detect_cluster(
                 elif isinstance(d, dict) and d.get("name"):
                     candidate_diseases.append(d["name"])
 
-        # 3. From AI diagnosis logs in DB for this report_id
-        ai_logged_diseases = get_ai_diagnosed_diseases_for_report(str(report_id))
+        # 3. From AI diagnosis logs in DB for this report_id (scoped to tenant)
+        ai_logged_diseases = get_ai_diagnosed_diseases_for_report(str(report_id), tenant_key=tenant_key)
         candidate_diseases.extend(ai_logged_diseases)
 
         # 4. If images provided with detect-cluster or in LAHIS and no candidate disease found yet
@@ -1712,8 +1851,15 @@ async def detect_cluster(
                             multiple_images_bytes.append(d)
                     except Exception:
                         pass
+            elif tenant_client:
+                try:
+                    multiple_images_bytes = await tenant_client.fetch_all_report_images_bytes(report_id)
+                except Exception as e:
+                    print(f"Could not fetch LAHIS images for cluster detection: {e}")
             elif all([api_url, client_id, client_secret]) and report_id:
                 try:
+                    if not token:
+                        token = await get_lahis_token(client_id, client_secret, api_url)
                     multiple_images_bytes = await fetch_lahis_report_images(report_id, token, api_url)
                 except Exception as e:
                     print(f"Could not fetch LAHIS images for cluster detection: {e}")
@@ -1746,18 +1892,19 @@ async def detect_cluster(
                 matched_trigger_disease = trig_canonical
                 break
 
-        # Record this incoming request to DB with detected disease
+        # Record this incoming request to DB with detected disease and tenant_key
         record_cluster_report(
             report_id=report_id,
             village_id=str(village_id),
             village_name=village_name,
             date_str=incident_date,
             raw_payload=json.dumps(request_params),
-            detected_disease=matched_trigger_disease or (candidate_diseases[0] if candidate_diseases else "")
+            detected_disease=matched_trigger_disease or (candidate_diseases[0] if candidate_diseases else ""),
+            tenant_key=tenant_key
         )
 
-        # Check all reports for this village across history
-        all_village_reports = get_village_all_reports(str(village_id))
+        # Check all reports for this village across history (tenant scoped)
+        all_village_reports = get_village_all_reports(str(village_id), tenant_key=tenant_key)
         report_count = len(all_village_reports)
 
         # Calculate timeline span for this village
@@ -1776,8 +1923,8 @@ async def detect_cluster(
             latest_date = max(report_dates)
             span_days = (latest_date - earliest_date).days
         else:
-            earliest_date = datetime.utcnow()
-            latest_date = datetime.utcnow()
+            earliest_date = datetime.now(timezone.utc)
+            latest_date = datetime.now(timezone.utc)
             span_days = 0
 
         # If not matched on current report, check if any prior report in village had a trigger disease
@@ -1817,8 +1964,11 @@ async def detect_cluster(
             village_id_int = int(village_id) if str(village_id).isdigit() else None
             authority_ids = incident.get("relevantAuthorityIds") or []
 
+            schema_slug = tenant_ctx.schema if tenant_ctx else "legacy"
+            cluster_external_id = f"cluster-{schema_slug}-{village_id}-{earliest_date.strftime('%Y%m%d')}-{latest_date.strftime('%Y%m%d')}"
+
             cluster_payload = {
-                "externalClusterId": f"cluster-{village_id}-{earliest_date.strftime('%Y%m%d')}-{latest_date.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6]}",
+                "externalClusterId": cluster_external_id,
                 "algorithmVersion": "podd-cluster-detector-v2",
                 "window": {
                     "from": earliest_date.strftime("%Y-%m-%d"),
@@ -1836,7 +1986,8 @@ async def detect_cluster(
                     "source": "fao-podd-cluster-detector",
                     "detected_disease": matched_trigger_disease,
                     "span_days": span_days,
-                    "report_count": report_count
+                    "report_count": report_count,
+                    "tenant_key": tenant_key
                 }
             }
 
@@ -1845,17 +1996,46 @@ async def detect_cluster(
                 "data": cluster_payload
             }
 
+            if job:
+                update_job(job.job_key, status="CALLBACK_PENDING", callback_payload=cluster_payload)
+
             try:
-                cluster_response = await submit_lahis_cluster(cluster_payload, token, api_url)
+                if tenant_client:
+                    cluster_response = await tenant_client.submit_cluster(cluster_external_id, cluster_payload)
+                else:
+                    if not token and all([client_id, client_secret, api_url]):
+                        token = await get_lahis_token(client_id, client_secret, api_url)
+                    cluster_response = await submit_lahis_cluster(cluster_payload, token, api_url)
+                
+                if job:
+                    update_job(job.job_key, status="COMPLETED", callback_response=cluster_response)
+
                 steps["step_5"] = {
                     "title": "5. LAHIS Callback Response",
                     "data": cluster_response
                 }
             except HTTPException as e:
+                if job:
+                    update_job(job.job_key, status="FAILED", error_message=e.detail)
                 steps["step_5"] = {
                     "title": "5. LAHIS Callback Response (Error)",
                     "data": {"status_code": e.status_code, "detail": e.detail}
                 }
+                latency = time.time() - start_time
+                log_request_response(
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=e.status_code,
+                    latency=latency,
+                    client_ip=client_ip,
+                    request_params=request_params,
+                    response_body=json.dumps({"detail": e.detail}),
+                    steps_json=steps,
+                    tenant_key=tenant_key
+                )
+                request.state.logged = True
+                # Propagate downstream callback failure
+                raise e
                 
         result = {
             "status": "success",
@@ -1869,45 +2049,53 @@ async def detect_cluster(
             "span_days": span_days,
             "cluster_response": cluster_response
         }
+        if job:
+            update_job(job.job_key, status="COMPLETED", model_result=result, callback_response=cluster_response)
         
         latency = time.time() - start_time
         log_request_response(
-            method="POST",
-            path="/detect-cluster",
+            method=request.method,
+            path=request.url.path,
             status_code=200,
             latency=latency,
             client_ip=client_ip,
             request_params=request_params,
             response_body=json.dumps(result),
-            steps_json=steps
+            steps_json=steps,
+            tenant_key=tenant_key
         )
+        request.state.logged = True
         return result
 
     except HTTPException as e:
         latency = time.time() - start_time
         log_request_response(
-            method="POST",
-            path="/detect-cluster",
+            method=request.method,
+            path=request.url.path,
             status_code=e.status_code,
             latency=latency,
             client_ip=client_ip,
             request_params=request_params,
             response_body=json.dumps({"detail": e.detail}),
-            steps_json=steps
+            steps_json=steps,
+            tenant_key=tenant_key
         )
+        request.state.logged = True
         raise e
     except Exception as e:
         latency = time.time() - start_time
         log_request_response(
-            method="POST",
-            path="/detect-cluster",
+            method=request.method,
+            path=request.url.path,
             status_code=500,
             latency=latency,
             client_ip=client_ip,
             request_params=request_params,
             response_body=json.dumps({"detail": str(e)}),
-            steps_json=steps
+            steps_json=steps,
+            tenant_key=tenant_key
         )
+        request.state.logged = True
         raise HTTPException(status_code=500, detail=f"Error detecting cluster: {str(e)}")
 
 def load_symptoms():
@@ -1955,10 +2143,12 @@ async def serve_landing_page():
 
 
 
-def fetch_all_logs_data(limit: Optional[int] = 50):
+def fetch_all_logs_data(limit: Optional[int] = 50, tenant: Optional[str] = None):
     if USE_DATASTORE and datastore_client:
         try:
             query = datastore_client.query(kind="ApiLog")
+            if tenant:
+                query.add_filter("tenant_key", "=", str(tenant))
             query.order = ["-timestamp"]
             fetch_limit = limit if (limit and limit > 0) else None
             results = list(query.fetch(limit=fetch_limit))
@@ -1987,8 +2177,18 @@ def fetch_all_logs_data(limit: Optional[int] = 50):
                 else:
                     parsed_steps = None
 
+                t_key = entity.get("tenant_key", "standalone")
+                t_code = None
+                if isinstance(parsed_params, dict) and isinstance(parsed_params.get("tenant"), dict):
+                    t_code = parsed_params["tenant"].get("code") or parsed_params["tenant"].get("schema")
+                if not t_code:
+                    t_code = t_key.split(":")[-1] if (t_key and ":" in t_key) else (t_key or "-")
+
                 logs.append({
                     "id": entity.key.id,
+                    "tenant_key": t_key,
+                    "tenant_id": t_key,
+                    "tenant_code": t_code,
                     "timestamp": entity.get("timestamp"),
                     "method": entity.get("method"),
                     "path": entity.get("path"),
@@ -2010,10 +2210,16 @@ def fetch_all_logs_data(limit: Optional[int] = 50):
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        if limit and limit > 0:
-            cursor.execute("SELECT * FROM api_logs ORDER BY id DESC LIMIT ?", (limit,))
+        if tenant:
+            if limit and limit > 0:
+                cursor.execute("SELECT * FROM api_logs WHERE tenant_key = ? ORDER BY id DESC LIMIT ?", (str(tenant), limit))
+            else:
+                cursor.execute("SELECT * FROM api_logs WHERE tenant_key = ? ORDER BY id DESC", (str(tenant),))
         else:
-            cursor.execute("SELECT * FROM api_logs ORDER BY id DESC")
+            if limit and limit > 0:
+                cursor.execute("SELECT * FROM api_logs ORDER BY id DESC LIMIT ?", (limit,))
+            else:
+                cursor.execute("SELECT * FROM api_logs ORDER BY id DESC")
         rows = cursor.fetchall()
         conn.close()
         
@@ -2031,8 +2237,18 @@ def fetch_all_logs_data(limit: Optional[int] = 50):
             except Exception:
                 parsed_steps = None
 
+            t_key = row["tenant_key"] if "tenant_key" in row.keys() else "standalone"
+            t_code = None
+            if isinstance(parsed_params, dict) and isinstance(parsed_params.get("tenant"), dict):
+                t_code = parsed_params["tenant"].get("code") or parsed_params["tenant"].get("schema")
+            if not t_code:
+                t_code = t_key.split(":")[-1] if (t_key and ":" in t_key) else (t_key or "-")
+
             logs.append({
                 "id": row["id"],
+                "tenant_key": t_key,
+                "tenant_id": t_key,
+                "tenant_code": t_code,
                 "timestamp": row["timestamp"],
                 "method": row["method"],
                 "path": row["path"],
@@ -2052,19 +2268,19 @@ def fetch_all_logs_data(limit: Optional[int] = 50):
 
 
 @app.get("/api/logs")
-async def get_logs(limit: Optional[int] = 50, username: str = Depends(authenticate_dashboard)):
-    return fetch_all_logs_data(limit=limit)
+async def get_logs(limit: Optional[int] = 50, tenant: Optional[str] = None, username: str = Depends(authenticate_dashboard)):
+    return fetch_all_logs_data(limit=limit, tenant=tenant)
 
 
 @app.get("/api/logs/export")
-async def export_logs(format: str = "json", username: str = Depends(authenticate_dashboard)):
-    logs = fetch_all_logs_data(limit=None)
+async def export_logs(format: str = "json", tenant: Optional[str] = None, username: str = Depends(authenticate_dashboard)):
+    logs = fetch_all_logs_data(limit=None, tenant=tenant)
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if format.lower() == "csv":
         output = io.StringIO()
         fieldnames = [
-            "id", "timestamp", "method", "path", "status_code", "latency",
+            "id", "tenant_code", "tenant_key", "timestamp", "method", "path", "status_code", "latency",
             "client_ip", "prompt_tokens", "output_tokens", "target",
             "image_path", "request_params", "response_body"
         ]
@@ -2083,9 +2299,28 @@ async def export_logs(format: str = "json", username: str = Depends(authenticate
                     target = f"Uploads: {', '.join(req_params['image_filenames'])}"
                 elif req_params.get("image_filename"):
                     target = f"Upload: {req_params['image_filename']}"
+                elif req_params.get("eventType"):
+                    target = f"Event: {req_params['eventType']}"
+
+            if target == "None":
+                status = log.get("status_code", 200)
+                if status and status >= 400:
+                    resp_body = log.get("response_body") or ""
+                    try:
+                        parsed = json.loads(resp_body)
+                        detail = parsed.get("detail") or parsed.get("error")
+                        target = f"Error: {detail}" if detail else f"HTTP {status}"
+                    except Exception:
+                        target = f"HTTP {status}"
+                elif log.get("path") == "/webhooks/lahis" and log.get("method") == "GET":
+                    target = "Webhook Health Probe"
+                elif log.get("path"):
+                    target = str(log.get("path"))
 
             writer.writerow({
                 "id": log.get("id"),
+                "tenant_code": log.get("tenant_code") or log.get("tenant_key", "default"),
+                "tenant_key": log.get("tenant_key", "default"),
                 "timestamp": log.get("timestamp"),
                 "method": log.get("method"),
                 "path": log.get("path"),
@@ -2118,16 +2353,19 @@ async def export_logs(format: str = "json", username: str = Depends(authenticate
 
 
 @app.get("/api/clusters")
-async def get_clusters(limit: int = 100, username: str = Depends(authenticate_dashboard)):
+async def get_clusters(limit: int = 100, tenant: Optional[str] = None, username: str = Depends(authenticate_dashboard)):
     reports = []
     if USE_DATASTORE and datastore_client:
         try:
             query = datastore_client.query(kind="ClusterReport")
+            if tenant:
+                query.add_filter("tenant_key", "=", str(tenant))
             query.order = ["-timestamp"]
             results = list(query.fetch(limit=limit))
             for entity in results:
                 reports.append({
                     "id": entity.key.id,
+                    "tenant_key": entity.get("tenant_key", "default"),
                     "timestamp": entity.get("timestamp"),
                     "date_str": entity.get("date_str"),
                     "report_id": entity.get("report_id"),
@@ -2144,12 +2382,16 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
             conn = sqlite3.connect(DB_PATH)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM cluster_reports ORDER BY id DESC LIMIT ?", (limit,))
+            if tenant:
+                cursor.execute("SELECT * FROM cluster_reports WHERE tenant_key = ? ORDER BY id DESC LIMIT ?", (str(tenant), limit))
+            else:
+                cursor.execute("SELECT * FROM cluster_reports ORDER BY id DESC LIMIT ?", (limit,))
             rows = cursor.fetchall()
             conn.close()
             for row in rows:
                 reports.append({
                     "id": row["id"],
+                    "tenant_key": row["tenant_key"] if "tenant_key" in row.keys() else "default",
                     "timestamp": row["timestamp"],
                     "date_str": row["date_str"],
                     "report_id": row["report_id"],
@@ -2161,12 +2403,16 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
         except Exception as e:
             print(f"SQLite fetch cluster reports error: {e}")
 
-    # Group by village_id
+    # Group by (tenant_key, village_id) so villages from different tenants never collide
     groups = {}
     for r in reports:
+        t_key = r.get("tenant_key") or "default"
         vid = r["village_id"]
-        if vid not in groups:
-            groups[vid] = {
+        group_key = f"{t_key}:{vid}"
+        if group_key not in groups:
+            groups[group_key] = {
+                "group_key": group_key,
+                "tenant_key": t_key,
                 "village_id": vid,
                 "village_name": r["village_name"] or "Unknown Village",
                 "reports": [],
@@ -2174,17 +2420,17 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
                 "detected_diseases": [],
                 "latest_timestamp": r["timestamp"]
             }
-        if r["report_id"] and r["report_id"] not in groups[vid]["reports"]:
-            groups[vid]["reports"].append(r["report_id"])
+        if r["report_id"] and r["report_id"] not in groups[group_key]["reports"]:
+            groups[group_key]["reports"].append(r["report_id"])
 
-        if r.get("detected_disease") and r["detected_disease"] not in groups[vid]["detected_diseases"]:
-            groups[vid]["detected_diseases"].append(r["detected_disease"])
+        if r.get("detected_disease") and r["detected_disease"] not in groups[group_key]["detected_diseases"]:
+            groups[group_key]["detected_diseases"].append(r["detected_disease"])
 
         d_str = r.get("date_str")
         if d_str:
             try:
                 dt = datetime.strptime(d_str, "%Y-%m-%d")
-                groups[vid]["dates"].append(dt)
+                groups[group_key]["dates"].append(dt)
             except Exception:
                 pass
 
@@ -2192,7 +2438,7 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
     grouped_list = []
     total_clusters = 0
 
-    for vid, g in groups.items():
+    for g_key, g in groups.items():
         if g["dates"]:
             min_d = min(g["dates"])
             max_d = max(g["dates"])
@@ -2216,7 +2462,9 @@ async def get_clusters(limit: int = 100, username: str = Depends(authenticate_da
             total_clusters += 1
 
         grouped_list.append({
-            "village_id": vid,
+            "group_key": g["group_key"],
+            "tenant_key": g["tenant_key"],
+            "village_id": g["village_id"],
             "village_name": g["village_name"],
             "start_date": start_date_str,
             "latest_date": latest_date_str,

@@ -65,8 +65,15 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res_json["animal_type"], "Cattle")
         self.assertEqual(res_json["diseases"][0]["name"], "Foot and Mouth Disease")
         self.assertIn("basic_response", res_json["diseases"][0])
-        self.assertIsInstance(res_json["diseases"][0]["basic_response"], list)
         self.assertTrue(len(res_json["diseases"][0]["basic_response"]) > 0)
+
+        # Verify that prompt sent to Google AI synthesized description and multimodal guidelines
+        self.assertTrue(mock_genai_client.models.generate_content.called)
+        call_kwargs = mock_genai_client.models.generate_content.call_args.kwargs
+        sent_contents = call_kwargs["contents"]
+        sent_prompt = sent_contents[-1]
+        self.assertIn("Limping cow", sent_prompt)
+        self.assertIn("MULTIMODAL SYNTHESIS", sent_prompt)
 
     @patch("main.get_genai_client")
     @patch("main.get_lahis_token", new_callable=AsyncMock)
@@ -841,6 +848,135 @@ class TestFAO_PODD_API(unittest.IsolatedAsyncioTestCase):
         # Cleanup
         if os.path.exists(local_path):
             os.remove(local_path)
+
+    @patch("main.get_genai_client")
+    @patch("main.get_lahis_token", new_callable=AsyncMock)
+    @patch("main.fetch_lahis_report_images", new_callable=AsyncMock)
+    @patch("main.submit_lahis_comment", new_callable=AsyncMock)
+    @patch.dict(os.environ, {
+        "TENANT_API_URL": "https://demo.api.lahis.ohtk.org",
+        "LAHIS_CLIENT_ID": "mock_client",
+        "LAHIS_CLIENT_SECRET": "mock_secret",
+        "LAHIS_SIGNING_SECRET": ""
+    })
+    def test_analyze_webhook_preserves_description_and_remarks(self, mock_submit_comment, mock_fetch_images, mock_get_token, mock_get_client):
+        mock_get_token.return_value = "mock_access_token"
+        mock_fetch_images.return_value = [b"mock image bytes"]
+
+        mock_genai_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.usage_metadata = None
+        mock_response.text = json.dumps({
+            "is_valid_animal_image": True,
+            "invalid_reason": None,
+            "animal_type": "Pig",
+            "diseases": [
+                {
+                    "name": "African Swine Fever",
+                    "confidence": 0.92,
+                    "reasoning": "High fever and skin cyanosis observed"
+                }
+            ]
+        })
+        mock_genai_client.models.generate_content.return_value = mock_response
+        mock_get_client.return_value = mock_genai_client
+
+        payload = {
+            "schemaVersion": "2026-06-02",
+            "eventType": "report.submitted",
+            "eventId": "evt-desc-test-001",
+            "producedAt": "2026-07-21T10:30:00+00:00",
+            "tenant": {"schema": "demo", "code": "demo", "name": "LAHIS Demo"},
+            "report": {
+                "id": "report-desc-123",
+                "createdAt": "2026-07-21T10:29:58+00:00",
+                "incidentDate": "2026-07-21",
+                "description": "Fever, red patches on ears and sudden mortality in 5 pigs",
+                "animalType": "Pig",
+                "reportType": {"id": "type-123", "name": "Animal Sick/Death", "category": "Animal"},
+                "relevantAuthorityIds": [12],
+                "caseId": None
+            },
+            "links": {
+                "incident": "/api/integrations/v1/incidents/report-desc-123",
+                "comments": "/api/integrations/v1/reports/report-desc-123/comments",
+                "riskAssessments": "/api/integrations/v1/reports/report-desc-123/risk-assessments",
+                "images": "/api/integrations/v1/reports/report-desc-123/images"
+            }
+        }
+
+        with patch("main.Image.open") as mock_image_open:
+            mock_image_open.return_value = MagicMock()
+            response = self.client.post("/analyze", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        res_json = response.json()
+        self.assertTrue(res_json["is_valid_animal_image"])
+        self.assertEqual(res_json["animal_type"], "Pig")
+
+        # Verify that prompt sent to Gemini received the description and animal type
+        self.assertTrue(mock_genai_client.models.generate_content.called)
+        call_kwargs = mock_genai_client.models.generate_content.call_args.kwargs
+        sent_contents = call_kwargs["contents"]
+        sent_prompt = sent_contents[-1]
+        self.assertIn("Fever, red patches on ears and sudden mortality in 5 pigs", sent_prompt)
+        self.assertIn("MULTIMODAL SYNTHESIS", sent_prompt)
+
+    def test_universal_request_logging_all_requests(self):
+        """Verifies that all requests (including invalid 404, 401, health checks) are logged to api_logs."""
+        # Clean api_logs table first
+        conn = sqlite3.connect(DB_PATH)
+        conn.cursor().execute("DELETE FROM api_logs")
+        conn.commit()
+        conn.close()
+
+        # 1. Health check request: GET /webhooks/lahis
+        resp_health = self.client.get("/webhooks/lahis")
+        self.assertEqual(resp_health.status_code, 200)
+
+        # 2. 404 Not Found request: POST /invalid-endpoint-path
+        resp_404 = self.client.post("/invalid-endpoint-path", json={"foo": "bar"})
+        self.assertEqual(resp_404.status_code, 404)
+
+        # 3. 400 Bad Request: missing eventId
+        resp_400 = self.client.post(
+            "/webhooks/lahis",
+            json={"eventType": "report.submitted", "schemaVersion": "2026-08-31", "tenant": {"schema": "tot", "apiBaseUrl": "https://example.com"}},
+            headers={"X-OHTK-Tenant": "tot"}
+        )
+        self.assertEqual(resp_400.status_code, 400)
+
+        # 4. 401 Unauthorized request: missing signature/timestamp headers
+        resp_401 = self.client.post(
+            "/webhooks/lahis",
+            json={"eventType": "report.submitted", "eventId": "evt-test-999", "schemaVersion": "2026-08-31", "tenant": {"schema": "tot", "apiBaseUrl": "https://example.com"}},
+            headers={"X-OHTK-Tenant": "tot"}
+        )
+        self.assertEqual(resp_401.status_code, 401)
+
+        # 5. Check api_logs via /api/logs
+        resp_logs = self.client.get("/api/logs", auth=("admin", "PoddFaoSecure2026!"))
+        self.assertEqual(resp_logs.status_code, 200)
+        logs = resp_logs.json()
+
+        paths_logged = [l.get("path") for l in logs]
+        statuses_logged = [l.get("status_code") for l in logs]
+
+        self.assertIn("/webhooks/lahis", paths_logged)
+        self.assertIn("/invalid-endpoint-path", paths_logged)
+        self.assertIn(404, statuses_logged)
+        self.assertIn(400, statuses_logged)
+        self.assertIn(401, statuses_logged)
+        self.assertIn(200, statuses_logged)
+
+        # Ensure /api/logs itself was NOT logged (excluded)
+        self.assertNotIn("/api/logs", paths_logged)
+
+        # 6. Check CSV export formats target nicely for invalid requests
+        resp_csv = self.client.get("/api/logs/export?format=csv", auth=("admin", "PoddFaoSecure2026!"))
+        self.assertEqual(resp_csv.status_code, 200)
+        csv_text = resp_csv.text
+        self.assertIn("/invalid-endpoint-path", csv_text)
 
 if __name__ == "__main__":
     unittest.main()

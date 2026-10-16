@@ -1,0 +1,93 @@
+{
+  "tenants": [
+    {
+      "tenant_key": "lahis:demo",
+      "deployment_id": "lahis",
+      "schema": "demo",
+      "code": "demo",
+      "name": "LAHIS Demo",
+      "api_base_url": "https://tot.api.lahis.ohtk.org",
+      "integration_code": "podd-ai-demo-v1",
+      "enabled_operations": ["report.submitted", "detect-cluster"],
+      "oauth": {
+        "client_id": "demo_client_id_here",
+        "client_secret_env": "LAHIS_DEMO_CLIENT_SECRET",
+        "credential_version": "v1"
+      },
+      "signing": {
+        "active_key_id": "key-demo-v1",
+        "keys": {
+          "key-demo-v1": {
+            "version": "1",
+            "secret_env": "LAHIS_DEMO_SIGNING_SECRET_V1",
+            "algorithm": "HMAC-SHA256"
+          }
+        }
+      },
+      "lang": "lo",
+      "config_revision": "2026-10-12",
+      "is_enabled": true
+    },
+    {
+      "tenant_key": "lahis:tot",
+      "deployment_id": "lahis",
+      "schema": "tot",
+      "code": "tot",
+      "name": "LAHIS TOT",
+      "api_base_url": "https://demo.api.lahis.ohtk.org",
+      "integration_code": "podd-ai-tot-v1",
+      "enabled_operations": ["report.submitted", "detect-cluster"],
+      "oauth": {
+        "client_id": "tot_client_id_here",
+        "client_secret_env": "LAHIS_TOT_CLIENT_SECRET",
+        "credential_version": "v1"
+      },
+      "signing": {
+        "active_key_id": "INTEGRATION_PODD_FAO_AI_WEBHOOK_SECRET",
+        "keys": {
+          "INTEGRATION_PODD_FAO_AI_WEBHOOK_SECRET": {
+            "version": "1",
+            "secret_env": "INTEGRATION_PODD_FAO_AI_WEBHOOK_SECRET",
+            "algorithm": "HMAC-SHA256"
+          },
+          "key-tot-v1": {
+            "version": "1",
+            "secret_env": "LAHIS_TOT_SIGNING_SECRET_V1",
+            "algorithm": "HMAC-SHA256"
+          }
+        }
+      },
+      "lang": "lo",
+      "config_revision": "2026-10-12",
+      "is_enabled": true
+    },
+    {
+      "tenant_key": "lahis:production",
+      "deployment_id": "lahis",
+      "schema": "production",
+      "code": "production",
+      "name": "LAHIS Production",
+      "api_base_url": "https://prod.api.lahis.ohtk.org",
+      "integration_code": "cmu-podd-fao-ai-production",
+      "enabled_operations": ["report.submitted", "detect-cluster"],
+      "oauth": {
+        "client_id": "prod_client_id_here",
+        "client_secret_env": "LAHIS_PROD_CLIENT_SECRET",
+        "credential_version": "v1"
+      },
+      "signing": {
+        "active_key_id": "key-prod-v1",
+        "keys": {
+          "key-prod-v1": {
+            "version": "1",
+            "secret_env": "LAHIS_PROD_SIGNING_SECRET_V1",
+            "algorithm": "HMAC-SHA256"
+          }
+        }
+      },
+      "lang": "lo",
+      "config_revision": "2026-10-12",
+      "is_enabled": true
+    }
+  ]
+}

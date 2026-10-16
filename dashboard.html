@@ -376,6 +376,61 @@
             color: var(--danger-color);
         }
 
+        .status-pill.warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+
+        .filter-group {
+            display: inline-flex;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .filter-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .filter-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-color);
+            color: #000000;
+            font-weight: 700;
+        }
+
+        .log-search-box {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.85rem;
+            outline: none;
+            width: 200px;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+
+        .log-search-box:focus {
+            border-color: var(--accent-color);
+        }
+
         .tester-badge {
             background: rgba(139, 92, 246, 0.15);
             color: #a78bfa;
@@ -790,7 +845,7 @@
                 <div class="logo-icon">F</div>
                 <div class="logo-title">
                     <h1>FAO-PODD Diagnostics</h1>
-                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.7.0</span></p>
+                    <p>AI Diagnosis Request Monitor <span style="font-size: 0.75rem; opacity: 0.7; background: var(--border-color); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 600;">v2.11.3</span></p>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
@@ -841,6 +896,12 @@
                 <div class="panel-header">
                     <div class="panel-title">Recent Requests</div>
                     <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <div class="filter-group">
+                            <button class="filter-btn active" id="filter-all" onclick="setLogFilter('all')">All (<span id="count-all">0</span>)</button>
+                            <button class="filter-btn" id="filter-valid" onclick="setLogFilter('valid')">Valid (<span id="count-valid">0</span>)</button>
+                            <button class="filter-btn" id="filter-invalid" onclick="setLogFilter('invalid')">Errors / Invalid (<span id="count-invalid">0</span>)</button>
+                        </div>
+                        <input type="text" id="log-search-input" class="log-search-box" placeholder="Search path, IP, error..." oninput="filterLogsSearch(this.value)" />
                         <button class="refresh-btn export-btn" onclick="exportAllLogs('json')" title="Export all historical logs as JSON">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             Export JSON
@@ -860,12 +921,12 @@
                         <thead>
                             <tr>
                                 <th>Time (UTC)</th>
-                                <th>Method</th>
+                                <th>Method & Endpoint</th>
                                 <th>Status</th>
                                 <th>Latency (s)</th>
-                                <th>Client IP</th>
+                                <th>Tenant Code</th>
                                 <th>Query Cost</th>
-                                <th>Target</th>
+                                <th>Target / Detail</th>
                             </tr>
                         </thead>
                         <tbody id="logs-tbody">
@@ -1089,7 +1150,18 @@
     <div class="modal-overlay" id="detail-modal" onclick="closeModal(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <button class="close-btn" onclick="closeModal(event)">&times;</button>
-            <h2 class="modal-title">Request Details</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 1.25rem; margin-bottom: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); align-items: center;">
+                <div><strong>Endpoint:</strong> <span id="modal-method-path" style="font-family: monospace; color: var(--accent-color); font-weight: 600;">-</span></div>
+                <div><strong>Status:</strong> <span id="modal-status-badge" class="status-pill">-</span></div>
+                <div><strong>Latency:</strong> <span id="modal-latency" style="font-family: monospace; color: var(--text-primary);">-</span></div>
+                <div><strong>Tenant Code:</strong> <span id="modal-tenant-code" style="font-family: monospace; color: var(--accent-color); font-weight: 600;">-</span></div>
+                <div><strong>Tenant ID:</strong> <span id="modal-tenant-id" style="font-family: monospace; color: var(--text-primary);">-</span></div>
+                <div><strong>Client IP:</strong> <span id="modal-client-ip" style="font-family: monospace; color: var(--text-primary);">-</span></div>
+            </div>
+
+            <div id="modal-error-banner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.9rem;">
+                <strong>❌ Request Error:</strong> <span id="modal-error-text"></span>
+            </div>
             
             <div id="modal-image-container" style="display: none; margin-bottom: 1.5rem;">
                 <div class="section-title">Analyzed Images</div>
@@ -1131,6 +1203,18 @@
         let currentLogs = [];
         let currentPage = 1;
         let pageSize = 15;
+        let activeFilter = 'all'; // 'all', 'valid', 'invalid'
+        let activeSearchQuery = '';
+
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
         async function fetchLogs() {
             try {
@@ -1140,11 +1224,59 @@
                 const logs = await response.json();
                 currentLogs = logs;
                 currentPage = 1;
-                renderLogs();
                 calculateStats(logs);
+                renderLogs();
             } catch (err) {
                 console.error('Failed to fetch logs:', err);
             }
+        }
+
+        function setLogFilter(filter) {
+            activeFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`filter-${filter}`);
+            if (activeBtn) activeBtn.classList.add('active');
+            currentPage = 1;
+            renderLogs();
+        }
+
+        function filterLogsSearch(query) {
+            activeSearchQuery = (query || '').trim().toLowerCase();
+            currentPage = 1;
+            renderLogs();
+        }
+
+        function getFilteredLogs() {
+            if (!currentLogs || !Array.isArray(currentLogs)) return [];
+            return currentLogs.filter(log => {
+                if (!log) return false;
+                const statusCode = log.status_code != null ? log.status_code : 200;
+                const isSuccess = statusCode >= 200 && statusCode < 300;
+
+                if (activeFilter === 'valid' && !isSuccess) return false;
+                if (activeFilter === 'invalid' && isSuccess) return false;
+
+                if (activeSearchQuery) {
+                    const path = String(log.path || '').toLowerCase();
+                    const method = String(log.method || '').toLowerCase();
+                    const tenant = String(log.tenant_code || log.tenant_key || '').toLowerCase();
+                    const status = String(statusCode);
+                    const ip = String(log.client_ip || '').toLowerCase();
+                    const paramsStr = JSON.stringify(log.request_params || {}).toLowerCase();
+                    const respStr = String(log.response_body || '').toLowerCase();
+
+                    const match = path.includes(activeSearchQuery)
+                        || method.includes(activeSearchQuery)
+                        || tenant.includes(activeSearchQuery)
+                        || status.includes(activeSearchQuery)
+                        || ip.includes(activeSearchQuery)
+                        || paramsStr.includes(activeSearchQuery)
+                        || respStr.includes(activeSearchQuery);
+
+                    if (!match) return false;
+                }
+                return true;
+            });
         }
 
         function changePageSize(newSize) {
@@ -1154,7 +1286,8 @@
         }
 
         function goToPage(page) {
-            const totalPages = Math.ceil(currentLogs.length / pageSize) || 1;
+            const filtered = getFilteredLogs();
+            const totalPages = Math.ceil(filtered.length / pageSize) || 1;
             if (page < 1) page = 1;
             if (page > totalPages) page = totalPages;
             currentPage = page;
@@ -1177,11 +1310,14 @@
 
         function renderLogs() {
             const tbody = document.getElementById('logs-tbody');
-            const logs = currentLogs;
-            const total = logs ? logs.length : 0;
+            const logs = getFilteredLogs();
+            const total = logs.length;
 
-            if (!logs || !Array.isArray(logs) || total === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-secondary);">No requests logged yet.</td></tr>';
+            if (total === 0) {
+                const emptyMsg = activeSearchQuery || activeFilter !== 'all'
+                    ? 'No requests match the current filter.'
+                    : 'No requests logged yet.';
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-secondary); padding: 2rem;">${emptyMsg}</td></tr>`;
                 renderPagination(0, 0, 0, 1, 1);
                 return;
             }
@@ -1214,19 +1350,46 @@
                 
                 const statusCode = (log && log.status_code != null) ? log.status_code : 200;
                 const isSuccess = statusCode >= 200 && statusCode < 300;
-                const statusClass = isSuccess ? 'success' : 'error';
+                const isClientError = statusCode >= 400 && statusCode < 500;
+                const statusClass = isSuccess ? 'success' : (isClientError ? 'warning' : 'error');
                 
-                // Get display label (image filename or report_id)
+                // Get display label (image filename, report_id, event, probe, or error details)
                 let target = 'None';
-                if (log && log.request_params) {
-                    if (log.request_params.report_id) {
-                        target = `Report ID: ${log.request_params.report_id}`;
-                    } else if (log.request_params.report && log.request_params.report.id) {
-                        target = `Report ID: ${log.request_params.report.id}`;
-                    } else if (log.request_params.image_filenames && log.request_params.image_filenames.length > 0) {
-                        target = `Uploads: ${log.request_params.image_filenames.join(', ')}`;
-                    } else if (log.request_params.image_filename) {
-                        target = `Upload: ${log.request_params.image_filename}`;
+                const req = log && log.request_params ? log.request_params : {};
+                if (req.report_id) {
+                    target = `Report ID: ${escapeHtml(req.report_id)}`;
+                } else if (req.report && req.report.id) {
+                    target = `Report ID: ${escapeHtml(req.report.id)}`;
+                } else if (req.image_filenames && req.image_filenames.length > 0) {
+                    target = `Uploads: ${escapeHtml(req.image_filenames.join(', '))}`;
+                } else if (req.image_filename) {
+                    target = `Upload: ${escapeHtml(req.image_filename)}`;
+                } else if (req.eventType) {
+                    target = `<span style="color: var(--accent-color); font-weight: 600;">Event: ${escapeHtml(req.eventType)}</span>`;
+                } else if (log && log.path === '/webhooks/lahis' && log.method === 'GET') {
+                    target = `<span style="color: #10b981; font-weight: 500;">🟢 Webhook Health Probe</span>`;
+                }
+
+                if (target === 'None') {
+                    if (!isSuccess) {
+                        let errDetail = '';
+                        if (log && log.response_body) {
+                            try {
+                                const parsed = JSON.parse(log.response_body);
+                                errDetail = parsed.detail || parsed.error || '';
+                            } catch (e) {
+                                errDetail = log.response_body.substring(0, 60);
+                            }
+                        }
+                        if (errDetail) {
+                            target = `<span style="color: #ef4444; font-weight: 500;" title="${escapeHtml(errDetail)}">❌ ${escapeHtml(errDetail)}</span>`;
+                        } else {
+                            target = `<span style="color: #ef4444; font-weight: 500;">❌ HTTP ${statusCode} Error</span>`;
+                        }
+                    } else if (req.animal_type) {
+                        target = `Animal: ${escapeHtml(req.animal_type)}`;
+                    } else if (log && log.path) {
+                        target = `<span style="color: var(--text-secondary);">${escapeHtml(log.path)}</span>`;
                     }
                 }
 
@@ -1241,22 +1404,31 @@
                 const costTitle = `Query Cost: ${costStr} (Prompt: ${promptTok} tokens, Output: ${outputTok} tokens)`;
 
                 let sourceBadge = '';
-                if (log && log.request_params && log.request_params.source === 'web-tester') {
+                if (req && req.source === 'web-tester') {
                     sourceBadge = ' <span class="tester-badge">Tester</span>';
                 }
 
                 const latencyNum = (log && typeof log.latency === 'number' && !isNaN(log.latency)) ? log.latency : 0;
+                const tenantCode = (log && log.tenant_code)
+                    || (req && req.tenant && (req.tenant.code || req.tenant.schema))
+                    || (log && (log.tenant_id || log.tenant_key) && (log.tenant_id || log.tenant_key).includes(':') ? (log.tenant_id || log.tenant_key).split(':').pop() : (log && (log.tenant_id || log.tenant_key)))
+                    || '-';
+                const tenantId = (log && (log.tenant_id || log.tenant_key)) || 'standalone';
+                const clientIp = (log && log.client_ip) || 'Unknown';
+                const logMethod = (log && log.method) || 'POST';
+                const logPath = (log && log.path) || '/analyze';
 
                 return `
                     <tr onclick="openModal(${globalIndex})">
                         <td title="Local time: ${timeLocalStr}">${timeStr}</td>
                         <td>
-                            <span style="font-weight: 600; color: var(--accent-color);">${(log && log.method) || 'POST'}</span>
+                            <span style="font-weight: 700; color: var(--accent-color);">${logMethod}</span>
+                            <span style="font-family: monospace; font-size: 0.8rem; color: var(--text-secondary); margin-left: 4px;" title="${escapeHtml(logPath)}">${escapeHtml(logPath)}</span>
                             ${sourceBadge}
                         </td>
                         <td><span class="status-pill ${statusClass}">${statusCode}</span></td>
                         <td>${latencyNum.toFixed(3)}s</td>
-                        <td>${(log && log.client_ip) || 'Unknown'}</td>
+                        <td title="Tenant ID: ${tenantId} | Client IP: ${clientIp}"><span style="font-family: monospace; font-size: 0.85rem; font-weight: 600; color: var(--accent-color);">${tenantCode}</span></td>
                         <td title="${costTitle}">
                             <span style="font-family: monospace; font-weight: 600; color: var(--accent-color); background: rgba(99, 102, 241, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-block;">${costStr}</span>
                         </td>
@@ -1318,6 +1490,7 @@
 
             const total = logs.length;
             const successCount = logs.filter(l => l && (l.status_code || 200) >= 200 && (l.status_code || 200) < 300).length;
+            const invalidCount = total - successCount;
             const successRate = ((successCount / total) * 100).toFixed(0);
             
             const totalLatency = logs.reduce((sum, l) => sum + (l && typeof l.latency === 'number' ? l.latency : 0), 0);
@@ -1329,21 +1502,86 @@
             document.getElementById('stat-success').innerText = `${successRate}%`;
             document.getElementById('stat-latency').innerText = `${avgLatency} ms`;
             document.getElementById('stat-cost').innerText = `฿${totalCost.toFixed(4)}`;
+
+            const cAll = document.getElementById('count-all');
+            if (cAll) cAll.innerText = total;
+            const cVal = document.getElementById('count-valid');
+            if (cVal) cVal.innerText = successCount;
+            const cInv = document.getElementById('count-invalid');
+            if (cInv) cInv.innerText = invalidCount;
         }
 
         function openModal(index) {
-            const log = currentLogs[index];
+            const filtered = getFilteredLogs();
+            const log = filtered[index] || currentLogs[index];
             if (!log) return;
+
+            const logMethod = (log && log.method) || 'POST';
+            const logPath = (log && log.path) || '/analyze';
+            const statusCode = (log && log.status_code != null) ? log.status_code : 200;
+            const isSuccess = statusCode >= 200 && statusCode < 300;
+            const isClientError = statusCode >= 400 && statusCode < 500;
+            const statusClass = isSuccess ? 'success' : (isClientError ? 'warning' : 'error');
+
+            const methodPathEl = document.getElementById('modal-method-path');
+            if (methodPathEl) methodPathEl.innerText = `${logMethod} ${logPath}`;
+
+            const statusBadgeEl = document.getElementById('modal-status-badge');
+            if (statusBadgeEl) {
+                statusBadgeEl.className = `status-pill ${statusClass}`;
+                statusBadgeEl.innerText = `${statusCode} ${isSuccess ? 'OK' : 'Error'}`;
+            }
+
+            const latencyEl = document.getElementById('modal-latency');
+            if (latencyEl) {
+                const lat = (log && typeof log.latency === 'number') ? log.latency : 0;
+                latencyEl.innerText = `${(lat * 1000).toFixed(0)} ms (${lat.toFixed(3)}s)`;
+            }
+
+            // Error banner
+            const errorBanner = document.getElementById('modal-error-banner');
+            const errorText = document.getElementById('modal-error-text');
+            if (errorBanner && errorText) {
+                if (!isSuccess) {
+                    let errDetail = '';
+                    if (log.response_body) {
+                        try {
+                            const parsed = JSON.parse(log.response_body);
+                            errDetail = parsed.detail || parsed.error || JSON.stringify(parsed);
+                        } catch (e) {
+                            errDetail = log.response_body;
+                        }
+                    }
+                    errorText.innerText = errDetail || `HTTP ${statusCode} Error`;
+                    errorBanner.style.display = 'block';
+                } else {
+                    errorBanner.style.display = 'none';
+                }
+            }
+
+            // Display tenant code, tenant ID, and client IP
+            const tenantCodeVal = (log && log.tenant_code)
+                || (log && log.request_params && log.request_params.tenant && (log.request_params.tenant.code || log.request_params.tenant.schema))
+                || (log && (log.tenant_id || log.tenant_key) && (log.tenant_id || log.tenant_key).includes(':') ? (log.tenant_id || log.tenant_key).split(':').pop() : (log && (log.tenant_id || log.tenant_key)))
+                || '-';
+            const tenantIdVal = (log && (log.tenant_id || log.tenant_key)) || 'standalone';
+            const clientIpVal = (log && log.client_ip) || 'Unknown';
+            const tenantCodeEl = document.getElementById('modal-tenant-code');
+            if (tenantCodeEl) tenantCodeEl.innerText = tenantCodeVal;
+            const tenantEl = document.getElementById('modal-tenant-id');
+            if (tenantEl) tenantEl.innerText = tenantIdVal;
+            const ipEl = document.getElementById('modal-client-ip');
+            if (ipEl) ipEl.innerText = clientIpVal;
 
             // Display image if available
             const imageContainer = document.getElementById('modal-image-container');
             const imagesWrapper = document.getElementById('modal-images-wrapper');
-            imagesWrapper.innerHTML = '';
+            if (imagesWrapper) imagesWrapper.innerHTML = '';
             if (log.image_path) {
                 const paths = log.image_path.split(',');
                 paths.forEach(p => {
                     const filename = p.split('/').pop();
-                    if (filename) {
+                    if (filename && imagesWrapper) {
                         const img = document.createElement('img');
                         img.src = `/api/logs/image/${filename}`;
                         img.alt = 'Analyzed Animal';
@@ -1356,24 +1594,30 @@
                         imagesWrapper.appendChild(img);
                     }
                 });
-                imageContainer.style.display = 'block';
+                if (imageContainer) imageContainer.style.display = 'block';
             } else {
-                imageContainer.style.display = 'none';
+                if (imageContainer) imageContainer.style.display = 'none';
             }
 
             // Display tokens/cost if available
             const costContainer = document.getElementById('modal-cost-container');
-            if (log.prompt_tokens !== undefined || log.output_tokens !== undefined) {
-                document.getElementById('modal-prompt-tokens').innerText = log.prompt_tokens || 0;
-                document.getElementById('modal-output-tokens').innerText = log.output_tokens || 0;
-                const cost = getGeminiCost(log);
-                document.getElementById('modal-estimated-cost').innerText = cost > 0 ? `฿${cost.toFixed(4)}` : '฿0.0000';
-                costContainer.style.display = 'block';
-            } else {
-                costContainer.style.display = 'none';
+            if (costContainer) {
+                if (log.prompt_tokens !== undefined || log.output_tokens !== undefined) {
+                    const promptEl = document.getElementById('modal-prompt-tokens');
+                    if (promptEl) promptEl.innerText = log.prompt_tokens || 0;
+                    const outputEl = document.getElementById('modal-output-tokens');
+                    if (outputEl) outputEl.innerText = log.output_tokens || 0;
+                    const cost = getGeminiCost(log);
+                    const costEl = document.getElementById('modal-estimated-cost');
+                    if (costEl) costEl.innerText = cost > 0 ? `฿${cost.toFixed(4)}` : '฿0.0000';
+                    costContainer.style.display = 'block';
+                } else {
+                    costContainer.style.display = 'none';
+                }
             }
 
-            document.getElementById('modal-request').innerText = JSON.stringify(log.request_params, null, 2);
+            const reqEl = document.getElementById('modal-request');
+            if (reqEl) reqEl.innerText = JSON.stringify(log.request_params, null, 2);
             
             // Format response nicely if it's JSON
             let responseText = log.response_body;
@@ -1382,13 +1626,14 @@
                 responseText = JSON.stringify(parsed, null, 2);
             } catch (e) {}
             
-            document.getElementById('modal-response').innerText = responseText;
+            const resEl = document.getElementById('modal-response');
+            if (resEl) resEl.innerText = responseText;
 
             // Render integration flow steps if available
             const stepsContainer = document.getElementById('modal-steps-container');
             const stepsContent = document.getElementById('modal-steps-content');
-            stepsContainer.style.display = 'none';
-            stepsContent.innerHTML = '';
+            if (stepsContainer) stepsContainer.style.display = 'none';
+            if (stepsContent) stepsContent.innerHTML = '';
             
             if (log.steps_json) {
                 try {
@@ -1548,11 +1793,15 @@
 
             const formData = new FormData();
             formData.append('report_id', reportId);
+            formData.append('tenant_code', 'local tester');
 
             try {
                 const response = await fetch('/detect-cluster', {
                     method: 'POST',
-                    headers: {'X-Source': 'web-tester'},
+                    headers: {
+                        'X-Source': 'web-tester',
+                        'X-Tenant-Code': 'local tester'
+                    },
                     body: formData
                 });
 
@@ -1754,12 +2003,14 @@
             if (!isTextOnly && reportId) formData.append('report_id', reportId);
             if (animalType) formData.append('animal_type', animalType);
             if (description) formData.append('description', description);
+            formData.append('tenant_code', 'local tester');
 
             try {
                 const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: {
-                        'X-Source': 'web-tester'
+                        'X-Source': 'web-tester',
+                        'X-Tenant-Code': 'local tester'
                     },
                     body: formData
                 });
